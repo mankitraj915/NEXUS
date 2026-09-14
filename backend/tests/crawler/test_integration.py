@@ -1,15 +1,17 @@
-import pytest
+import asyncio
 import os
 import uuid
-import asyncio
-from sqlalchemy.ext.asyncio import AsyncSession
+
+import pytest
+from httpx import AsyncClient
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.domains.documents.models import Document, DocumentVersion
 from app.domains.users.models import User
-from httpx import AsyncClient
-from app.main import app
 
 from .mock_server import start_mock_server
+
 
 @pytest.fixture(scope="module", autouse=True)
 def mock_server():
@@ -18,6 +20,7 @@ def mock_server():
     yield
     server.shutdown()
     os.environ["ALLOW_LOCAL_URLS"] = "false"
+
 
 @pytest.mark.asyncio
 async def test_crawler_end_to_end(db_session: AsyncSession, client: AsyncClient):
@@ -28,22 +31,28 @@ async def test_crawler_end_to_end(db_session: AsyncSession, client: AsyncClient)
     await db_session.refresh(user)
 
     # 1. Create Project
-    resp = await client.post("/api/v1/projects/", json={
-        "name": "Crawl Project",
-        "description": "Integration test project",
-        "user_id": str(user.id)
-    })
+    resp = await client.post(
+        "/api/v1/projects/",
+        json={
+            "name": "Crawl Project",
+            "description": "Integration test project",
+            "user_id": str(user.id),
+        },
+    )
     project_id = resp.json()["id"]
 
     # 2. Create Crawl Job
-    resp = await client.post("/api/v1/crawl/jobs", json={
-        "project_id": project_id,
-        "seed_url": "http://127.0.0.1:8081/",
-        "max_pages": 5,
-        "max_depth": 2,
-        "respect_robots": True,
-        "concurrency_limit": 2
-    })
+    resp = await client.post(
+        "/api/v1/crawl/jobs",
+        json={
+            "project_id": project_id,
+            "seed_url": "http://127.0.0.1:8081/",
+            "max_pages": 5,
+            "max_depth": 2,
+            "respect_robots": True,
+            "concurrency_limit": 2,
+        },
+    )
     assert resp.status_code == 201
     job_id = resp.json()["id"]
 
@@ -62,8 +71,8 @@ async def test_crawler_end_to_end(db_session: AsyncSession, client: AsyncClient)
     # 4. Check stats
     resp = await client.get(f"/api/v1/crawl/jobs/{job_id}/stats")
     stats = resp.json()
-    assert stats["fetched"] == 2 # / and /page1
-    assert stats["failed"] == 1 # /admin (blocked by robots)
+    assert stats["fetched"] == 2  # / and /page1
+    assert stats["failed"] == 1  # /admin (blocked by robots)
 
     # 5. Check documents
     stmt = select(Document).where(Document.project_id == uuid.UUID(project_id))

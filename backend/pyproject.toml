@@ -40,6 +40,20 @@ packages = ["app"]
 line-length = 88
 target-version = "py312"
 
+[tool.ruff.lint]
+ignore = [
+    "B008",    # FastAPI Depends() idiom in endpoint function signatures
+    "BLE001",  # Catching Exception is used intentionally for fallback routing / graceful retrieval degradation
+    "S110",    # Handled cache loading exception pass
+]
+
+[tool.mypy]
+python_version = "3.12"
+explicit_package_bases = true
+mypy_path = "."
+check_untyped_defs = true
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"

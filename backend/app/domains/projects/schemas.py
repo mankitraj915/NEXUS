@@ -1,12 +1,16 @@
-from pydantic import BaseModel, ConfigDict
 import uuid
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
+
 
 class ProjectBase(BaseModel):
     name: str
 
+
 class ProjectCreate(ProjectBase):
     user_id: uuid.UUID
+
 
 class ProjectResponse(ProjectBase):
     id: uuid.UUID

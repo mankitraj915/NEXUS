@@ -1,5 +1,6 @@
 from fastapi import APIRouter
-from app.api.v1 import projects, crawl, search
+
+from app.api.v1 import crawl, projects, search
 
 api_router = APIRouter()
 api_router.include_router(projects.router, prefix="/projects", tags=["projects"])

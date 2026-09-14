@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Dict, List, Optional
+from pydantic import BaseModel
+
 
 class QueryFeatures(BaseModel):
     # Continuous scores [0, 1]
@@ -12,6 +12,7 @@ class QueryFeatures(BaseModel):
     natural_language_score: float = 0.0
     complexity_score: float = 0.0
 
+
 class QueryClasses(BaseModel):
     # Boolean flags
     EXACT_TERM: bool = False
@@ -21,6 +22,7 @@ class QueryClasses(BaseModel):
     NATURAL_LANGUAGE_QUESTION: bool = False
     MIXED: bool = False
     AMBIGUOUS: bool = False
+
 
 class RetrievalPlan(BaseModel):
     bm25_depth: int
@@ -33,14 +35,17 @@ class RetrievalPlan(BaseModel):
     reason: str
     policy_version: str = "1.0.0"
 
+
 class QueryAnalysis(BaseModel):
     raw_query: str
     normalized_query: str
     features: QueryFeatures
     classes: QueryClasses
-    plan: Optional[RetrievalPlan] = None
+    plan: RetrievalPlan | None = None
+
 
 from datetime import datetime
+
 
 class QueryVariant(BaseModel):
     variant_id: str
@@ -48,6 +53,6 @@ class QueryVariant(BaseModel):
     variant_type: str
     generator: str
     generator_version: str
-    confidence: Optional[float] = None
+    confidence: float | None = None
     is_original: bool
     created_at: datetime

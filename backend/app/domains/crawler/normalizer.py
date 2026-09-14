@@ -1,5 +1,6 @@
 import urllib.parse
 
+
 def normalize_url(url: str) -> str:
     """
     Normalizes a URL to a canonical format.
@@ -15,24 +16,27 @@ def normalize_url(url: str) -> str:
     scheme = parsed.scheme.lower()
     netloc = parsed.netloc.lower()
 
-    if scheme == 'http' and netloc.endswith(':80'):
+    if scheme == "http" and netloc.endswith(":80"):
         netloc = netloc[:-3]
-    elif scheme == 'https' and netloc.endswith(':443'):
+    elif scheme == "https" and netloc.endswith(":443"):
         netloc = netloc[:-4]
 
     path = parsed.path
     if not path:
         path = "/"
 
-    normalized = urllib.parse.urlunparse((
-        scheme,
-        netloc,
-        path,
-        parsed.params,
-        parsed.query,
-        "" # Drop fragment
-    ))
+    normalized = urllib.parse.urlunparse(
+        (
+            scheme,
+            netloc,
+            path,
+            parsed.params,
+            parsed.query,
+            "",  # Drop fragment
+        )
+    )
     return normalized
+
 
 def resolve_url(base_url: str, link: str) -> str:
     """Resolves a relative link against a base URL."""

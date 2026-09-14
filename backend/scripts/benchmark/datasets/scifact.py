@@ -42,18 +42,11 @@ class SciFactDataset(DatasetProvider):
                     "metadata": data.get("metadata", {})
                 }
                 
-    def iter_queries(self) -> Generator[QueryItem, None, None]:
-        queries_path = os.path.join(self.cache_dir, "scifact", "queries.jsonl")
-        with open(queries_path, encoding="utf-8") as f:
-            for line in f:
-                data = json.loads(line)
-                yield {
-                    "id": str(data["_id"]),
-                    "text": data.get("text", "")
-                }
-                
-    def get_qrels(self) -> Dict[str, Dict[str, int]]:
-        qrels_path = os.path.join(self.cache_dir, "scifact", "qrels", "test.tsv")
+    def get_qrels(self, split: str = "test") -> Dict[str, Dict[str, int]]:
+        qrels_file = "test.tsv" if split == "test" else "train.tsv" if split == "train" else f"{split}.tsv"
+        qrels_path = os.path.join(self.cache_dir, "scifact", "qrels", qrels_file)
+        if not os.path.exists(qrels_path):
+            raise FileNotFoundError(f"Qrels file for split '{split}' not found at {qrels_path}")
         qrels = {}
         with open(qrels_path, encoding="utf-8") as f:
             header = f.readline() # skip header
@@ -69,3 +62,22 @@ class SciFactDataset(DatasetProvider):
                     qrels[qid] = {}
                 qrels[qid][docid] = score
         return qrels
+
+    def iter_queries(self, split: str = "test") -> Generator[QueryItem, None, None]:
+        queries_path = os.path.join(self.cache_dir, "scifact", "queries.jsonl")
+        if split in ("test", "train"):
+            qrels = self.get_qrels(split=split)
+            valid_qids = set(qrels.keys())
+        else:
+            valid_qids = None
+
+        with open(queries_path, encoding="utf-8") as f:
+            for line in f:
+                data = json.loads(line)
+                qid = str(data["_id"])
+                if valid_qids is not None and qid not in valid_qids:
+                    continue
+                yield {
+                    "id": qid,
+                    "text": data.get("text", "")
+                }

@@ -30,10 +30,10 @@ class DatasetProvider(abc.ABC):
         pass
         
     @abc.abstractmethod
-    def iter_queries(self) -> Generator[QueryItem, None, None]:
+    def iter_queries(self, split: str = "test") -> Generator[QueryItem, None, None]:
         pass
         
     @abc.abstractmethod
-    def get_qrels(self) -> Dict[str, Dict[str, int]]:
+    def get_qrels(self, split: str = "test") -> Dict[str, Dict[str, int]]:
         """Returns {query_id: {doc_id: score}}"""
         pass

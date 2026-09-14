@@ -1,0 +1,15 @@
+.venv/
+backend/.venv/
+.cache/
+backend/.cache/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.log
+*.aux
+*.out
+*.pdf
+.env
+backend/.env

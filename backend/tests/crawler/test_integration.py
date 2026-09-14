@@ -1,0 +1,75 @@
+import pytest
+import os
+import uuid
+import asyncio
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.domains.documents.models import Document, DocumentVersion
+from app.domains.users.models import User
+from httpx import AsyncClient
+from app.main import app
+
+from .mock_server import start_mock_server
+
+@pytest.fixture(scope="module", autouse=True)
+def mock_server():
+    server = start_mock_server(8081)
+    os.environ["ALLOW_LOCAL_URLS"] = "true"
+    yield
+    server.shutdown()
+    os.environ["ALLOW_LOCAL_URLS"] = "false"
+
+@pytest.mark.asyncio
+async def test_crawler_end_to_end(db_session: AsyncSession, client: AsyncClient):
+    # 0. Create User
+    user = User(email="crawler@example.com", hashed_password="pw")
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    # 1. Create Project
+    resp = await client.post("/api/v1/projects/", json={
+        "name": "Crawl Project",
+        "description": "Integration test project",
+        "user_id": str(user.id)
+    })
+    project_id = resp.json()["id"]
+
+    # 2. Create Crawl Job
+    resp = await client.post("/api/v1/crawl/jobs", json={
+        "project_id": project_id,
+        "seed_url": "http://127.0.0.1:8081/",
+        "max_pages": 5,
+        "max_depth": 2,
+        "respect_robots": True,
+        "concurrency_limit": 2
+    })
+    assert resp.status_code == 201
+    job_id = resp.json()["id"]
+
+    # 3. Wait for crawl to complete
+    max_wait = 20
+    completed = False
+    for _ in range(max_wait):
+        resp = await client.get(f"/api/v1/crawl/jobs/{job_id}")
+        if resp.json()["status"] == "COMPLETED":
+            completed = True
+            break
+        await asyncio.sleep(0.5)
+
+    assert completed, "Crawler did not complete in time"
+
+    # 4. Check stats
+    resp = await client.get(f"/api/v1/crawl/jobs/{job_id}/stats")
+    stats = resp.json()
+    assert stats["fetched"] == 2 # / and /page1
+    assert stats["failed"] == 1 # /admin (blocked by robots)
+
+    # 5. Check documents
+    stmt = select(Document).where(Document.project_id == uuid.UUID(project_id))
+    docs = (await db_session.execute(stmt)).scalars().all()
+    assert len(docs) == 2
+
+    stmt = select(DocumentVersion)
+    versions = (await db_session.execute(stmt)).scalars().all()
+    assert len(versions) == 2

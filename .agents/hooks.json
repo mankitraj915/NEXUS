@@ -1,0 +1,10 @@
+{
+  "autonomous-execution": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File .agents/auto-continue.ps1"
+      }
+    ]
+  }
+}

@@ -194,14 +194,14 @@ async def test_lexical_retrieval_isolation(db_session):
         db_session, project_a.id, "NexusAlpha", top_k=10
     )
     assert len(results_a_for_alpha) == 1
-    assert results_a_for_alpha[0].document_id == ver_a.document_id
+    assert results_a_for_alpha[0].document_id == str(ver_a.document_id)
 
     # Query Project B for its own term: must return Project B's document
     results_b_for_beta = await retrieve_lexical(
         db_session, project_b.id, "NexusBeta", top_k=10
     )
     assert len(results_b_for_beta) == 1
-    assert results_b_for_beta[0].document_id == ver_b.document_id
+    assert results_b_for_beta[0].document_id == str(ver_b.document_id)
 
 
 @pytest.mark.asyncio

@@ -32,11 +32,34 @@ def is_db_reachable() -> bool:
         return False
 
 
-# Create a separate engine for testing
-engine = create_async_engine(settings.SQLALCHEMY_DATABASE_URI, echo=False)
+from sqlalchemy.pool import NullPool
+
+# Create a separate engine for testing with NullPool to prevent asyncpg connection conflicts
+engine = create_async_engine(
+    settings.SQLALCHEMY_DATABASE_URI, echo=False, poolclass=NullPool
+)
 TestingSessionLocal = async_sessionmaker(
     autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
 )
+
+
+TRUNCATE_SQL = text("""
+    TRUNCATE TABLE 
+        benchmark_mappings, 
+        chunk_embeddings, 
+        crawl_jobs, 
+        crawl_targets, 
+        document_chunks, 
+        document_versions, 
+        documents, 
+        projects, 
+        search_document_stats, 
+        search_postings, 
+        search_project_stats, 
+        search_terms, 
+        users 
+    CASCADE;
+""")
 
 
 @pytest_asyncio.fixture
@@ -47,18 +70,23 @@ async def setup_db():
         )
 
     try:
-        async with engine.begin() as conn:
-            await conn.execute(text("SELECT 1"))
-            await conn.run_sync(Base.metadata.drop_all)
-            await conn.run_sync(Base.metadata.create_all)
+        async with engine.connect() as conn:
+            await conn.execute(TRUNCATE_SQL)
+            await conn.commit()
     except Exception as exc:
-        pytest.skip(f"PostgreSQL/pgvector database error: {exc}")
+        # If tables don't exist yet, create them
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+        except Exception:
+            pytest.skip(f"PostgreSQL/pgvector database error: {exc}")
 
     yield
 
     try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
+        async with engine.connect() as conn:
+            await conn.execute(TRUNCATE_SQL)
+            await conn.commit()
     except Exception:
         pass
 
@@ -67,6 +95,7 @@ async def setup_db():
 async def db_session(setup_db):
     async with TestingSessionLocal() as session:
         yield session
+        await session.close()
 
 
 @pytest_asyncio.fixture

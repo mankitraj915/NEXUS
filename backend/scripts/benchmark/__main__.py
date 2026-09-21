@@ -1,21 +1,20 @@
 import argparse
 import asyncio
 import json
-import uuid
 import time
-from datetime import datetime, timezone
-from sqlalchemy import select, func
+import uuid
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db, engine
-from app.db.base import Base
-from app.domains.projects.models import Project
-from app.domains.documents.service import save_document
-from app.domains.documents.models import Document, DocumentVersion
-from app.domains.embeddings.models import Chunk, ChunkEmbedding
+from app.db.session import get_db
 from app.domains.benchmark.models import BenchmarkMapping
+from app.domains.documents.models import Document
+from app.domains.documents.service import save_document
 from app.domains.embeddings.pipeline import process_pending_chunks
+from app.domains.projects.models import Project
 from scripts.benchmark.datasets.scifact import SciFactDataset
+
 
 async def create_benchmark_project(db: AsyncSession, name: str) -> Project:
     # Use a dummy user or fetch first user. For simplicity, we just create a dummy user.
@@ -60,7 +59,7 @@ async def cmd_prepare(args):
         project_name = f"Benchmark: {provider.get_name()} {provider.get_version()} {int(time.time())}"
         project = await create_benchmark_project(db, project_name)
         
-        print(f"Ingesting corpus...")
+        print("Ingesting corpus...")
         count = 0
         for item in provider.iter_corpus():
             # Combine title and text for search

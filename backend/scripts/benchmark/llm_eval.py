@@ -1,20 +1,21 @@
 
 
-import asyncio
-import uuid
-import time
 import json
-import os
+import time
+import uuid
+
 from sqlalchemy import select
+
 from app.db.session import get_db
 from app.domains.benchmark.models import BenchmarkMapping
-from scripts.benchmark.datasets.scifact import SciFactDataset
-from app.domains.search.query.llm_provider import OpenAICompatibleProvider
-from app.domains.search.query.drift import SemanticDriftFilter
 from app.domains.search.query.cache import VariantCache
+from app.domains.search.query.drift import SemanticDriftFilter
+from app.domains.search.query.llm_provider import OpenAICompatibleProvider
 from app.domains.search.query.transformer import LLMQueryTransformer
-from scripts.benchmark.experiment import ExperimentTracker
 from app.domains.search.retrieval.orchestrator import execute_search
+from scripts.benchmark.datasets.scifact import SciFactDataset
+from scripts.benchmark.experiment import ExperimentTracker
+
 
 async def cmd_generate_llm_variants(args):
     dataset_name = args.dataset
@@ -79,7 +80,7 @@ async def cmd_generate_llm_variants(args):
             
     avg_lat = total_latency / max(1, count)
     avg_vars = total_variants_accepted / max(1, count)
-    print(f"--- Generation Complete ---")
+    print("--- Generation Complete ---")
     print(f"Total queries processed: {count}")
     print(f"Total variants generated: {total_variants_generated}")
     print(f"Total variants accepted: {total_variants_accepted}")

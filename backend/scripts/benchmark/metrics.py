@@ -1,7 +1,7 @@
 import math
-from typing import List, Dict, Set
 
-def precision_at_k(retrieved_ids: List[str], qrels: Dict[str, int], k: int, threshold: int = 1) -> float:
+
+def precision_at_k(retrieved_ids: list[str], qrels: dict[str, int], k: int, threshold: int = 1) -> float:
     """
     Calculate Precision@K.
     A document is considered relevant if its score in qrels >= threshold.
@@ -12,7 +12,7 @@ def precision_at_k(retrieved_ids: List[str], qrels: Dict[str, int], k: int, thre
     relevant_retrieved = sum(1 for doc_id in k_retrieved if qrels.get(doc_id, 0) >= threshold)
     return relevant_retrieved / k
 
-def recall_at_k(retrieved_ids: List[str], qrels: Dict[str, int], k: int, threshold: int = 1) -> float:
+def recall_at_k(retrieved_ids: list[str], qrels: dict[str, int], k: int, threshold: int = 1) -> float:
     """
     Calculate Recall@K.
     A document is considered relevant if its score in qrels >= threshold.
@@ -26,7 +26,7 @@ def recall_at_k(retrieved_ids: List[str], qrels: Dict[str, int], k: int, thresho
     relevant_retrieved = sum(1 for doc_id in k_retrieved if qrels.get(doc_id, 0) >= threshold)
     return relevant_retrieved / total_relevant
 
-def mrr(retrieved_ids: List[str], qrels: Dict[str, int], threshold: int = 1) -> float:
+def mrr(retrieved_ids: list[str], qrels: dict[str, int], threshold: int = 1) -> float:
     """
     Calculate Mean Reciprocal Rank (for a single query).
     Returns 1 / rank of the FIRST relevant document (score >= threshold).
@@ -37,7 +37,7 @@ def mrr(retrieved_ids: List[str], qrels: Dict[str, int], threshold: int = 1) -> 
             return 1.0 / (idx + 1)
     return 0.0
 
-def dcg_at_k(retrieved_ids: List[str], qrels: Dict[str, int], k: int) -> float:
+def dcg_at_k(retrieved_ids: list[str], qrels: dict[str, int], k: int) -> float:
     """
     Calculate Discounted Cumulative Gain at K using graded relevance.
     Formula: sum((2^rel - 1) / log2(rank + 1))
@@ -50,21 +50,21 @@ def dcg_at_k(retrieved_ids: List[str], qrels: Dict[str, int], k: int) -> float:
             dcg += (2 ** rel - 1) / math.log2(idx + 2)
     return dcg
 
-def ndcg_at_k(retrieved_ids: List[str], qrels: Dict[str, int], k: int) -> float:
+def ndcg_at_k(retrieved_ids: list[str], qrels: dict[str, int], k: int) -> float:
     """
     Calculate Normalized Discounted Cumulative Gain at K.
     Uses graded relevance directly from qrels.
     """
     actual_dcg = dcg_at_k(retrieved_ids, qrels, k)
     # Ideal DCG: sort all qrels by relevance descending
-    ideal_ranking = sorted([doc_id for doc_id in qrels.keys()], key=lambda d: qrels[d], reverse=True)
+    ideal_ranking = sorted([doc_id for doc_id in qrels], key=lambda d: qrels[d], reverse=True)
     ideal_dcg = dcg_at_k(ideal_ranking, qrels, k)
     
     if ideal_dcg == 0.0:
         return 0.0
     return actual_dcg / ideal_dcg
 
-def jaccard_at_k(list_a: List[str], list_b: List[str], k: int) -> float:
+def jaccard_at_k(list_a: list[str], list_b: list[str], k: int) -> float:
     """
     Calculate Jaccard Similarity between top-K sets of two lists.
     |A ∩ B| / |A ∪ B|

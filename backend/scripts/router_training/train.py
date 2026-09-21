@@ -1,11 +1,12 @@
 import json
+import os
+import pickle
+
 import numpy as np
-from sklearn.model_selection import KFold
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
-import pickle
-import os
+from sklearn.model_selection import KFold
+from sklearn.tree import DecisionTreeClassifier
 
 OUTCOME_FILE = "scripts/router_training/action_outcome_matrix.jsonl"
 MODEL_OUT = "scripts/router_training/router.pkl"

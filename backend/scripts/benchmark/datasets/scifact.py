@@ -1,10 +1,12 @@
-import os
 import json
+import os
+import ssl
 import urllib.request
 import zipfile
-import ssl
-from typing import Generator, Dict
-from scripts.benchmark.datasets.base import DatasetProvider, CorpusItem, QueryItem
+from collections.abc import Generator
+
+from scripts.benchmark.datasets.base import CorpusItem, DatasetProvider, QueryItem
+
 
 class SciFactDataset(DatasetProvider):
     def __init__(self, cache_dir: str = ".cache/scifact"):
@@ -42,7 +44,7 @@ class SciFactDataset(DatasetProvider):
                     "metadata": data.get("metadata", {})
                 }
                 
-    def get_qrels(self, split: str = "test") -> Dict[str, Dict[str, int]]:
+    def get_qrels(self, split: str = "test") -> dict[str, dict[str, int]]:
         qrels_file = "test.tsv" if split == "test" else "train.tsv" if split == "train" else f"{split}.tsv"
         qrels_path = os.path.join(self.cache_dir, "scifact", "qrels", qrels_file)
         if not os.path.exists(qrels_path):

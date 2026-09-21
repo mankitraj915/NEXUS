@@ -1,18 +1,16 @@
 import asyncio
 import json
-import uuid
-import time
 import statistics
-import os
+import time
+import uuid
+
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.domains.benchmark.models import BenchmarkMapping
-from scripts.benchmark.datasets.scifact import SciFactDataset
-from app.domains.search.retrieval.orchestrator import execute_search
-from scripts.benchmark.experiment import ExperimentTracker
 from app.domains.search.query.features import extract_features
+from app.domains.search.retrieval.orchestrator import execute_search
+from scripts.benchmark.datasets.scifact import SciFactDataset
 
 # The Action Space
 CONFIGS = {
@@ -112,7 +110,7 @@ async def generate_dataset():
                 record["probe"]["median_latency_ms"] = statistics.median(probe_latencies)
                 
                 # 3. Evaluate all configurations
-                from scripts.benchmark.metrics import ndcg_at_k, recall_at_k, mrr
+                from scripts.benchmark.metrics import mrr, ndcg_at_k, recall_at_k
                 
                 for cfg_name, cfg in CONFIGS.items():
                     latencies = []

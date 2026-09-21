@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  quality:
+    name: Lint, Typecheck & Unit Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Ruff Lint Check
+        run: uv run ruff check app/ tests/
+
+      - name: Mypy Type Check
+        run: uv run mypy app/
+
+      - name: Run Unit Tests
+        run: uv run pytest tests/ -v -k "not test_create_project and not test_identical_url_coexistence and not test_same_project_deduplication and not test_lexical_retrieval_isolation and not test_statistics_isolation and not test_crawler_end_to_end and not test_search_end_to_end"

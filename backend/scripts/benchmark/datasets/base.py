@@ -1,5 +1,7 @@
 import abc
-from typing import Generator, TypedDict, Dict
+from collections.abc import Generator
+from typing import TypedDict
+
 
 class CorpusItem(TypedDict):
     id: str
@@ -23,7 +25,6 @@ class DatasetProvider(abc.ABC):
     @abc.abstractmethod
     def prepare(self):
         """Download or prepare dataset locally"""
-        pass
         
     @abc.abstractmethod
     def iter_corpus(self) -> Generator[CorpusItem, None, None]:
@@ -34,6 +35,5 @@ class DatasetProvider(abc.ABC):
         pass
         
     @abc.abstractmethod
-    def get_qrels(self, split: str = "test") -> Dict[str, Dict[str, int]]:
+    def get_qrels(self, split: str = "test") -> dict[str, dict[str, int]]:
         """Returns {query_id: {doc_id: score}}"""
-        pass

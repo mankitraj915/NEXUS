@@ -1,6 +1,3 @@
-import statistics
-import time
-from typing import List, Dict, Any
 
 class ExperimentTracker:
     def __init__(self):
@@ -14,8 +11,8 @@ class ExperimentTracker:
     def add_latency(self, latency_ms: float):
         self.metrics["latency"].append(latency_ms)
         
-    def add_metrics(self, ext_ids: List[str], qrels: Dict[str, int]):
-        from scripts.benchmark.metrics import ndcg_at_k, recall_at_k, mrr
+    def add_metrics(self, ext_ids: list[str], qrels: dict[str, int]):
+        from scripts.benchmark.metrics import mrr, ndcg_at_k, recall_at_k
         self.metrics["ndcg@5"].append(ndcg_at_k(ext_ids, qrels, k=5))
         self.metrics["ndcg@10"].append(ndcg_at_k(ext_ids, qrels, k=10))
         self.metrics["recall@5"].append(recall_at_k(ext_ids, qrels, k=5, threshold=1))
@@ -24,7 +21,7 @@ class ExperimentTracker:
         self.metrics["recall@100"].append(recall_at_k(ext_ids, qrels, k=100, threshold=1))
         self.metrics["mrr"].append(mrr(ext_ids, qrels))
         
-    def get_summary(self) -> Dict[str, float]:
+    def get_summary(self) -> dict[str, float]:
         def avg(l): return sum(l) / len(l) if l else 0
         def p(l, p_val):
             if not l: return 0

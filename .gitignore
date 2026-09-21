@@ -1,15 +1,54 @@
-.venv/
-backend/.venv/
-.cache/
-backend/.cache/
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+backend/.venv/
+
+# Caches
+.cache/
+backend/.cache/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-*.log
-*.aux
-*.out
-*.pdf
+
+# Environment & secrets
 .env
 backend/.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.pdf
+*.tex
+*.synctex.gz
+
+# Model weights & pickled models (download at runtime)
+*.pkl
+!backend/scripts/router_training/router.pkl
+*.bin
+*.pt
+*.onnx
+
+# Local data
+*.db
+*.sqlite3
+
+# Hooks (local agent config)
+hooks.json

@@ -1,12 +1,14 @@
-import json
-import numpy as np
-from sklearn.model_selection import GroupKFold
-from sklearn.tree import DecisionTreeClassifier, export_text
-from sklearn.ensemble import RandomForestClassifier
-import os
 import copy
-from app.domains.search.query.features import QueryFeatures
+import json
+import os
+
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GroupKFold
+from sklearn.tree import DecisionTreeClassifier
+
 from app.domains.search.query.classifier import classify_query
+from app.domains.search.query.features import QueryFeatures
 from app.domains.search.query.planner import generate_plan
 
 OUTCOME_FILE = "scripts/router_training/action_outcome_matrix.jsonl"

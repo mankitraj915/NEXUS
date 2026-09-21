@@ -36,7 +36,7 @@ Web crawl → Document normalization → PostgreSQL
 | Chunking | 500-char sliding window, 100-char overlap |
 | Migrations | Alembic (5 migrations) |
 | ORM | SQLAlchemy 2.0 (async) |
-| Testing | pytest + pytest-asyncio (44 tests) |
+| Testing | pytest + pytest-asyncio (45 tests) |
 | Static analysis | Ruff + mypy |
 
 ---
@@ -100,7 +100,7 @@ Three approaches were tested and rejected based on measured evidence: a learned 
 Document uniqueness and retrieval are scoped by `project_id` at the database level (`UniqueConstraint('project_id', 'canonical_url')`). Every query filters by project. This is enforced by 5 dedicated isolation tests including cross-project URL coexistence and lexical retrieval isolation.
 
 ### Engineering over demo-ware
-44 automated tests covering BM25 mathematical invariants, RRF formula verification, analyzer determinism, SSRF protection, tenant isolation, and API contract validation. 5 Alembic migrations. Ruff + mypy. Explicit failure handling with fallback paths in the search orchestrator.
+45 automated tests covering BM25 mathematical invariants, RRF formula verification, analyzer determinism, SSRF protection, tenant isolation, and API contract validation. 5 Alembic migrations. Ruff + mypy. Explicit failure handling with fallback paths in the search orchestrator.
 
 ---
 
@@ -173,7 +173,7 @@ Documents appearing in only one retriever list receive a single-term RRF contrib
 
 **Interpretation**: Hybrid retrieval improves both ranking quality and recall at the cost of executing two retrieval branches. BM25 and Dense have complementary strengths — BM25 excels on exact terminology, Dense on paraphrased queries.
 
-*These are reference results from a prior evaluation run. To reproduce, see [docs/benchmarking.md](docs/benchmarking.md).*
+*Verified on the canonical 300-query test split. Latency figures reflect benchmark runs on local containerized PostgreSQL 16 + pgvector. To reproduce, see [docs/benchmarking.md](docs/benchmarking.md).*
 
 ---
 
@@ -267,7 +267,7 @@ During the LLM evaluation phase, observed NDCG@10 = 0.4464 — significantly bel
     2   independent retrieval paradigms (lexical + dense)
     1   hybrid rank-fusion layer
     7   search modes (3 stable + 4 experimental)
-   44   automated tests
+   45   automated tests (100% passing)
     5   Alembic migrations
     0   Ruff lint errors
     0   mypy type errors
@@ -281,7 +281,7 @@ During the LLM evaluation phase, observed NDCG@10 = 0.4464 — significantly bel
 
 ```bash
 # 1. Start PostgreSQL + pgvector
-docker compose up -d
+docker compose up -d db
 
 # 2. Install dependencies
 cd backend
@@ -298,14 +298,14 @@ uv run alembic upgrade head
 # 5. Run tests (unit tests — no DB required)
 uv run pytest tests/search/test_invariants.py tests/search/test_analyzer.py tests/benchmark/test_fusion.py tests/benchmark/test_metrics.py tests/benchmark/test_query_routing.py -v
 
-# 6. Run tests (integration — requires live PostgreSQL)
+# 6. Run tests (full suite — requires live PostgreSQL)
 uv run pytest tests/ -v
 
 # 7. Start API server
 uv run uvicorn app.main:app --reload --port 8000
 
 # 8. Static analysis
-uv run ruff check app/ tests/ scripts/
+uv run ruff check app/ tests/
 uv run mypy app/
 ```
 

@@ -36,9 +36,9 @@ Measured on SciFact (300-query test split, depth 100/100):
 
 ### Empirical k-parameter findings:
 - Cormack et al. originally suggested k=60 for large-scale web collections to dampen the influence of extreme outlier ranks.
-- On SciFact (5,183 scientific abstracts), tuning k down to 10 yielded a +0.0145 NDCG@10 improvement over k=60.
+- On the evaluated SciFact test split (5,183 scientific abstracts), tuning k down to 10 yielded a +0.0145 NDCG@10 improvement over k=60. This is an empirical finding on this specific technical abstract corpus rather than a universal claim across arbitrary document domains.
 - Lower k sharpens the rank decay: rank 1 + rank 1 agreement contributes `(1/11) + (1/12) = 0.1742`, whereas rank 10 + rank 10 contributes `(1/20) + (1/20) = 0.1000`. Under k=60, the distinction between top and mediocre ranks is heavily dampened (`0.0325` vs `0.0286`).
-- Hybrid RRF (k=10) improves NDCG@10 by +6.7% over BM25-only and +8.2% over Dense-only. Recall@100 reaches 0.9577.
+- Hybrid RRF (k=10) improves NDCG@10 by +6.7% over BM25-only and +8.2% over Dense-only on this workload. Recall@100 reaches 0.9577.
 - The cost is executing both branches in parallel, adding ~100ms P95 latency over single-retriever modes.
 
 ## Trade-offs

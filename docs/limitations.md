@@ -16,7 +16,7 @@ The corpus size is small by production standards. Behavior at 100K+ documents ha
 
 ## No authentication or authorization
 
-The API does not implement authentication. Project isolation is enforced at the data layer (project_id filtering), but any caller can access any project via the API. This is acceptable for a portfolio/research system but not for production deployment.
+The API does not implement authentication. Project isolation is enforced at the data layer (project_id filtering), but any caller can access any project via the API. This is appropriate for an experimental retrieval testbed but would require tenant authentication tokens in production.
 
 ## Single-node deployment
 

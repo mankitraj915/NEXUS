@@ -28,7 +28,7 @@ Rejected. NDCG decreased at every depth while latency increased dramatically.
 |---:|---:|---:|
 | No reranking (baseline) | 0.7188 | 313.14 ms |
 | 10 | 0.6858 | 608.76 ms |
-| 25 | 0.6751 | ~1,600 ms |
+| 25 | 0.6751 | 1,475.43 ms |
 | 50 | 0.6691 | 3,288.34 ms |
 
 At every depth:

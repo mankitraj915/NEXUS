@@ -1,6 +1,6 @@
 # NEXUS
 
-> **Technical Thesis**: Information retrieval architecture justified through empirical measurement: combining first-principles BM25 lexical indexing and vector search under Reciprocal Rank Fusion, with design decisions governed by measured rank quality, regret analysis, and latency cost rather than infrastructure complexity.
+> **Technical Thesis**: NEXUS is an experimental retrieval engine designed to investigate when combining lexical and dense retrieval justifies its added complexity. Design decisions are governed by empirical rank quality, regret analysis, and latency cost rather than infrastructure fashion: implementation → measurement → failure → decision.
 
 ```
 Web Ingestion / Crawler ──► Document Normalization ──► PostgreSQL 16 (Unified Store)
@@ -26,14 +26,14 @@ Evaluated against 5,183 scientific research abstracts and the canonical 300-quer
 
 ### Key Empirical Findings:
 1. **Complementary Strengths**: BM25 excels on exact scientific terms and identifiers; dense retrieval recovers semantically paraphrased claims. Combining both via RRF yields a **+6.7% NDCG@10 gain** over BM25-only and **+8.2%** over Dense-only, driving Recall@100 to 95.77%.
-2. **The RRF k-Parameter Sweep**: Cormack et al. originally proposed $k=60$ for ad-hoc web search. On SciFact, sweeping $k \in \{10, 30, 60\}$ revealed that $k=10$ provides sharper rank damping, increasing weight for top-rank cross-retriever agreements and producing a **+0.0145 NDCG@10 improvement** over $k=60$.
+2. **The RRF k-Parameter Sweep**: Cormack et al. originally proposed $k=60$ for ad-hoc web search. On the evaluated SciFact test split, sweeping $k \in \{10, 30, 60\}$ revealed that $k=10$ provides sharper rank damping, increasing weight for top-rank cross-retriever agreements and producing a **+0.0145 NDCG@10 improvement** over $k=60$. This $k=10$ configuration is an empirical result on this specific short-abstract technical corpus rather than a universally optimal parameter across arbitrary document collections.
 3. **Latency Trade-off**: Hybrid retrieval executes lexical and dense paths concurrently via `asyncio.create_task`, incurring ~100ms P95 overhead over single-branch retrieval.
 
 ---
 
-## 90-Second CTO Inspection Path
+## Codebase Inspection Path
 
-To evaluate engineering depth without reading every line of the codebase:
+For engineers evaluating architecture and implementation depth directly from source:
 
 ```
 1. Verify Invariants (0.2s)    ──► python -m scripts.benchmark verify (validates IR math & RRF)
@@ -111,7 +111,7 @@ flowchart TD
 
 ## Negative Results: Engineering by Measurement
 
-A key indicator of engineering maturity is preserving, documenting, and learning from architectural paths that failed empirically.
+Architecture governed by empirical measurement requires documenting and evaluating discarded design paths alongside successful baselines.
 
 ### 1. Learned Query Router — REJECTED (ADR-004)
 - **Hypothesis**: A decision tree trained on 8 query features (token count, identifier density, quoted ratio, term rarity, natural language score, etc.) could dynamically route queries to BM25-only to save 50% latency without degrading ranking quality.
@@ -140,7 +140,7 @@ A key indicator of engineering maturity is preserving, documenting, and learning
 |---|---:|---:|---:|
 | **Baseline (No Rerank)** | **0.7188** | **313.14 ms** | **1.0×** |
 | Top 10 Candidates | 0.6858 | 608.76 ms | 1.94× |
-| Top 25 Candidates | 0.6751 | ~1,475.43 ms | 4.71× |
+| Top 25 Candidates | 0.6751 | 1,475.43 ms | 4.71× |
 | Top 50 Candidates | 0.6691 | 3,288.34 ms | 10.50× |
 
 - **Decision**: **Rejected**. On this corpus and chunk size (500 chars), the cross-encoder *reduced* NDCG@10 at every depth while inflating tail latency by up to 10×. The already-fused RRF ranking was higher quality than the lightweight cross-encoder's passage scores.
@@ -227,7 +227,7 @@ uv run python -m scripts.benchmark evaluate --dataset scifact --split test
 
 ```
 NEXUS/
-├── README.md                                 # Technical thesis, evidence, and CTO guide
+├── README.md                                 # System thesis, empirical evidence, and architecture
 ├── docker-compose.yml                        # PostgreSQL 16 + pgvector container definition
 ├── docs/                                     # System documentation
 │   ├── adr/                                  # 6 Architectural Decision Records (001 - 006)

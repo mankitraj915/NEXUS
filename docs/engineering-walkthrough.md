@@ -135,9 +135,10 @@ Final integration tests verifying:
 
 ## Current state
 
-The system is a functional hybrid search engine with:
-- A measured production baseline (Hybrid RRF: NDCG@10 = 0.7188)
-- Three documented experimental rejections
-- 44 automated tests covering correctness invariants
-- Zero static analysis violations
-- Reproducible benchmark infrastructure
+The system is an empirically evaluated hybrid search engine with:
+- A measured production baseline (Hybrid RRF $k=10$: NDCG@10 = 0.7188, Recall@100 = 0.9577)
+- An empirical hyperparameter sweep on $k \in \{10, 30, 60\}$ documenting the rank damping mechanism
+- Three documented experimental rejections (Learned Router, Cross-Encoder, LLM Query Expansion)
+- 45 automated tests protecting mathematical invariants, analyzer determinism, and multi-tenant isolation
+- Zero static analysis violations across all 80 source files (`uv run ruff check .` and `uv run mypy .`)
+- Instant offline benchmark verification (`uv run python -m scripts.benchmark verify`) alongside full live-database evaluation on SciFact

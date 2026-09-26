@@ -40,10 +40,9 @@ def label_oracle_b(outcomes, epsilon=0.005):
     min_latency = float('inf')
     
     for cfg_name, results in outcomes.items():
-        if results["ndcg_10"] >= threshold:
-            if results["median_latency_ms"] < min_latency:
-                min_latency = results["median_latency_ms"]
-                best_action = get_action_index(cfg_name)
+        if results["ndcg_10"] >= threshold and results["median_latency_ms"] < min_latency:
+            min_latency = results["median_latency_ms"]
+            best_action = get_action_index(cfg_name)
                 
     return best_action
 
@@ -114,20 +113,20 @@ def train_and_evaluate():
         print("No records found.")
         return
         
-    feature_keys = sorted(list(records[0]["features"].keys()))
-    X = []
+    feature_keys = sorted(records[0]["features"].keys())
+    X_list: list[list[float]] = []
     y_oracle_b = [] # Quality-constrained latency
     y_oracle_a = [] # Pure quality
     
     epsilon = 0.005 # configurable tolerance
     
     for r in records:
-        vec = [r["features"].get(k, 0.0) for k in feature_keys]
-        X.append(vec)
+        vec = [float(r["features"].get(k, 0.0)) for k in feature_keys]
+        X_list.append(vec)
         y_oracle_b.append(label_oracle_b(r["outcomes"], epsilon=epsilon))
         
         # Oracle A: pure max ndcg, tie-break lowest latency
-        best_ndcg = -1
+        best_ndcg = -1.0
         best_lat = float('inf')
         best_a = 0
         for cfg_name, res in r["outcomes"].items():
@@ -137,7 +136,7 @@ def train_and_evaluate():
                 best_a = get_action_index(cfg_name)
         y_oracle_a.append(best_a)
         
-    X = np.array(X)
+    X = np.array(X_list)
     y = np.array(y_oracle_b)
     
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
@@ -148,9 +147,6 @@ def train_and_evaluate():
     }
     
     results_summary = {}
-    
-    # Store predictions for regret analysis
-    best_model_name = "Decision Tree"
     
     for name, model_cls in models.items():
         all_y_pred = np.zeros_like(y)

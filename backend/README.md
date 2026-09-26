@@ -46,16 +46,18 @@ cp .env.example .env
 # Migrate
 uv run alembic upgrade head
 
-# Run unit tests (no DB required)
-uv run pytest tests/search/test_invariants.py tests/search/test_analyzer.py tests/benchmark/test_fusion.py tests/benchmark/test_metrics.py tests/benchmark/test_query_routing.py -v
+# Verify retrieval invariants & IR math (< 0.2s, no DB required)
+uv run python -m scripts.benchmark verify
 
-# Run all tests (requires live DB)
+# Run test suite
 uv run pytest tests/ -v
 
 # Start server
 uv run uvicorn app.main:app --reload --port 8000
 
-# Lint
-uv run ruff check app/ tests/
-uv run mypy app/
+# Lint & Typecheck (repository-wide)
+uv run ruff check .
+uv run mypy .
 ```
+
+

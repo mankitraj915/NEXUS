@@ -8,7 +8,7 @@ on:
 
 jobs:
   quality:
-    name: Lint, Typecheck & Unit Tests
+    name: Lint, Typecheck, Harness Verification & Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -27,13 +27,16 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --all-groups
 
-      - name: Ruff Lint Check
-        run: uv run ruff check app/ tests/
+      - name: Ruff Lint Check (Repository-wide)
+        run: uv run ruff check .
 
-      - name: Mypy Type Check
-        run: uv run mypy app/
+      - name: Mypy Type Check (Repository-wide)
+        run: uv run mypy .
 
-      - name: Run Unit Tests
-        run: uv run pytest tests/ -v -k "not test_create_project and not test_identical_url_coexistence and not test_same_project_deduplication and not test_lexical_retrieval_isolation and not test_statistics_isolation and not test_crawler_end_to_end and not test_search_end_to_end"
+      - name: Benchmark Invariants Verification
+        run: uv run python -m scripts.benchmark verify
+
+      - name: Run Test Suite
+        run: uv run pytest tests/ -v

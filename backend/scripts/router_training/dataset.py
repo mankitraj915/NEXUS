@@ -3,6 +3,7 @@ import json
 import statistics
 import time
 import uuid
+from typing import Any
 
 from sqlalchemy import select
 
@@ -30,8 +31,7 @@ async def measure_probe(db, project_id, query):
     Executes a BM25 depth=5 probe and measures its latency.
     Returns (probe_latency_ms, max_bm25_score, score_variance, candidates_count, exact_match)
     """
-    t0 = time.time()
-    candidates, _ = await execute_search(
+    _ = await execute_search(
         db=db,
         project_id=project_id,
         query=query,
@@ -85,7 +85,7 @@ async def generate_dataset():
                 features = extract_features(q_text, 0.1) # Note: we use dummy term rarity for speed in this test
                 feat_time = (time.time() - t0_feat) * 1000
                 
-                record = {
+                record: dict[str, Any] = {
                     "query_id": qid,
                     "query_text": q_text,
                     "features": features.model_dump(),
@@ -99,11 +99,11 @@ async def generate_dataset():
                 for _ in range(3):
                     t0_probe = time.time()
                     try:
-                        cands = await execute_search(
+                        await execute_search(
                             db=db, project_id=project_id, query=q_text, mode="hybrid_fixed",
                             top_k=5, retrieval_k_bm25=5, retrieval_k_dense=0, rrf_k=5
                         )
-                    except:
+                    except Exception:
                         pass
                     probe_latencies.append((time.time() - t0_probe) * 1000)
                 

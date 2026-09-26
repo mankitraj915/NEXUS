@@ -1,7 +1,7 @@
 [project]
 name = "nexus"
 version = "0.1.0"
-description = "AI-native search and research engine"
+description = "Hybrid search engine combining custom BM25, dense retrieval (pgvector), and Reciprocal Rank Fusion"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -45,6 +45,7 @@ ignore = [
     "B008",    # FastAPI Depends() idiom in endpoint function signatures
     "BLE001",  # Catching Exception is used intentionally for fallback routing / graceful retrieval degradation
     "S110",    # Handled cache loading exception pass
+    "ASYNC230", # Allow standard file I/O in offline scripts and benchmark runners
 ]
 
 [tool.mypy]

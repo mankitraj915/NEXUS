@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "nexus"
     POSTGRES_PASSWORD: str = "nexus_password"
     POSTGRES_SERVER: str = "localhost"
-    POSTGRES_PORT: str = "5432"
+    POSTGRES_PORT: str = "5433"
     POSTGRES_DB: str = "nexus"
 
     OPENAI_API_KEY: str | None = None

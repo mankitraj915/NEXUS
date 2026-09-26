@@ -3,6 +3,7 @@
 import json
 import time
 import uuid
+from typing import Any
 
 from sqlalchemy import select
 
@@ -62,7 +63,7 @@ async def cmd_generate_llm_variants(args):
     # Gather metrics
     for q in queries:
         t0 = time.time()
-        variants = await transformer.transform(q["text"])
+        _ = await transformer.transform(q["text"])
         lat = time.time() - t0
         total_latency += lat
         
@@ -123,7 +124,7 @@ async def cmd_evaluate_llm(args):
         
     try:
         with open(llm_manifest_path, 'r') as f:
-            llm_manifest = json.load(f)
+            _ = json.load(f)
     except FileNotFoundError:
         print("LLM generation manifest not found. Run generate-llm-variants first.")
         return
@@ -132,7 +133,7 @@ async def cmd_evaluate_llm(args):
     qrels = ds.get_qrels()
     queries = list(ds.iter_queries())
 
-    experiments = [
+    experiments: list[dict[str, Any]] = [
         {"name": "A. Fixed RRF", "mode": "hybrid_fixed", "rrf_k": 10},
         {"name": "B. Rule-Based Multi-Query (Strategy A)", "mode": "multi_query_rule", "strategy": "strategy_a"},
         {"name": "C. LLM (1 variant / weight 1.0)", "mode": "multi_query_llm", "max_variants": 1, "variant_weight": 1.0},
@@ -141,7 +142,7 @@ async def cmd_evaluate_llm(args):
         {"name": "F. LLM (2 variants / weight 0.75)", "mode": "multi_query_llm", "max_variants": 2, "variant_weight": 0.75},
     ]
 
-    results_map = {}
+    results_map: dict[str, Any] = {}
     
     async for db in get_db():
         stmt = select(BenchmarkMapping).where(BenchmarkMapping.benchmark_project_id == project_id)
@@ -166,14 +167,14 @@ async def cmd_evaluate_llm(args):
                     db=db,
                     project_id=project_id,
                     query=query["text"],
-                    mode=exp["mode"],
+                    mode=str(exp["mode"]),
                     top_k=100,
                     retrieval_k=100,
                     rerank_k=0,
                     rrf_k=10,
-                    multi_query_strategy=exp.get("strategy", "strategy_a"),
-                    llm_max_variants=exp.get("max_variants", 3),
-                    llm_variant_weight=exp.get("variant_weight", 1.0)
+                    multi_query_strategy=str(exp.get("strategy", "strategy_a")),
+                    llm_max_variants=int(exp.get("max_variants", 3)),
+                    llm_variant_weight=float(exp.get("variant_weight", 1.0)),
                 )
                 
                 latency = (time.time() - t0) * 1000

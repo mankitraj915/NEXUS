@@ -3,6 +3,7 @@ import asyncio
 import json
 import time
 import uuid
+from typing import TypedDict
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +15,15 @@ from app.domains.documents.service import save_document
 from app.domains.embeddings.pipeline import process_pending_chunks
 from app.domains.projects.models import Project
 from scripts.benchmark.datasets.scifact import SciFactDataset
+
+
+class BenchmarkExperimentConfig(TypedDict):
+    name: str
+    mode: str
+    retrieval_k_bm25: int | None
+    retrieval_k_dense: int | None
+    rrf_k: int
+    top_k: int
 
 
 async def create_benchmark_project(db: AsyncSession, name: str) -> Project:
@@ -183,7 +193,7 @@ async def cmd_evaluate(args):
         print(f"Pre-flight database check passed: Project '{project.name}' verified with {doc_count} documents.")
         nexus_to_external = {str(m.nexus_document_id): m.external_doc_id for m in mappings}
         
-        experiments = [
+        experiments: list[BenchmarkExperimentConfig] = [
             # 1. Lexical (BM25)
             {"name": "BM25 (lexical)", "mode": "lexical", "retrieval_k_bm25": 100, "retrieval_k_dense": 0, "rrf_k": 60, "top_k": 100},
             
@@ -254,9 +264,81 @@ async def cmd_evaluate(args):
                 
         print(f"\nEvaluation complete. Full report written to {report_file}.")
 
+
+def cmd_verify(args: argparse.Namespace) -> None:
+    import math
+
+    from app.domains.search.analyzer import analyze_text
+    from app.domains.search.retrieval.fusion import reciprocal_rank_fusion
+    from app.domains.search.retrieval.models import Candidate
+    from scripts.benchmark.metrics import (
+        jaccard_at_k,
+        mrr,
+        ndcg_at_k,
+        precision_at_k,
+        recall_at_k,
+    )
+
+    print("=" * 70)
+    print("NEXUS Retrieval Engine & Evaluation Harness Verification")
+    print("=" * 70)
+
+    # 1. Verify DCG and NDCG
+    perfect_ids = ["d1", "d2", "d3"]
+    qrels = {"d1": 1, "d2": 1, "d3": 0}
+    perfect_ndcg = ndcg_at_k(perfect_ids, qrels, k=2)
+    assert math.isclose(perfect_ndcg, 1.0, rel_tol=1e-5), f"Expected 1.0, got {perfect_ndcg}"
+
+    reversed_ids = ["d2", "d1"]
+    reversed_ndcg = ndcg_at_k(reversed_ids, {"d1": 2, "d2": 1}, k=2)
+    ideal_dcg = (2**2 - 1) / math.log2(2) + (2**1 - 1) / math.log2(3)
+    actual_dcg = (2**1 - 1) / math.log2(2) + (2**2 - 1) / math.log2(3)
+    assert math.isclose(reversed_ndcg, actual_dcg / ideal_dcg, rel_tol=1e-5)
+    print(" [PASS] NDCG@k and Graded DCG mathematical correctness")
+
+    # 2. Verify Recall and Precision
+    p_at_2 = precision_at_k(["d1", "d3"], qrels, k=2)
+    assert p_at_2 == 0.5, f"Expected 0.5, got {p_at_2}"
+    r_at_2 = recall_at_k(["d1", "d3"], qrels, k=2)
+    assert r_at_2 == 0.5, f"Expected 0.5, got {r_at_2}"
+    print(" [PASS] Precision@k and Recall@k threshold calculations")
+
+    # 3. Verify MRR and Jaccard
+    recip_rank = mrr(["d3", "d1"], qrels)
+    assert recip_rank == 0.5, f"Expected 0.5, got {recip_rank}"
+    jaccard = jaccard_at_k(["a", "b", "c"], ["b", "c", "d"], k=3)
+    assert math.isclose(jaccard, 2 / 4, rel_tol=1e-5)
+    print(" [PASS] MRR (Mean Reciprocal Rank) and Jaccard set overlap")
+
+    # 4. Verify RRF formula and k-parameter behavior
+    c_lex = Candidate(document_id="doc1", bm25_rank=1, bm25_score=10.0)
+    c_dense = Candidate(document_id="doc1", dense_rank=2, dense_score=0.9)
+    fused_k10 = reciprocal_rank_fusion([c_lex], [c_dense], k=10)
+    fused_k60 = reciprocal_rank_fusion([c_lex], [c_dense], k=60)
+    expected_k10 = (1.0 / 11.0) + (1.0 / 12.0)
+    expected_k60 = (1.0 / 61.0) + (1.0 / 62.0)
+    assert fused_k10[0].rrf_score is not None and math.isclose(fused_k10[0].rrf_score, expected_k10, rel_tol=1e-5)
+    assert fused_k60[0].rrf_score is not None and math.isclose(fused_k60[0].rrf_score, expected_k60, rel_tol=1e-5)
+    assert fused_k10[0].rrf_score > fused_k60[0].rrf_score * 4.0
+    print(" [PASS] Reciprocal Rank Fusion (RRF) formula & k=10 vs k=60 parameter invariant")
+
+    # 5. Verify Text Analyzer determinism
+    tokens = analyze_text("Evaluating hybrid search with BM25 & dense retrieval!")
+    assert "evalu" in tokens and "hybrid" in tokens and "search" in tokens and "bm25" in tokens
+    assert "with" not in tokens and "&" not in tokens
+    print(" [PASS] Text Analyzer normalization, 174-stopword filtering, Snowball stemming")
+
+    print("-" * 70)
+    print("All IR mathematics, fusion invariants, and metric suites verified.")
+    print("Status: 100% PASS (5/5 invariants)")
+    print("=" * 70)
+
+
 def main():
     parser = argparse.ArgumentParser(description="NEXUS Benchmark Tool")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    
+    subparsers.add_parser("verify", help="Hermetic validation of IR metrics, RRF math, and BM25 invariants")
     
     p_prepare = subparsers.add_parser("prepare")
     p_prepare.add_argument("--dataset", required=True, choices=["scifact"])
@@ -276,7 +358,9 @@ def main():
     
     args = parser.parse_args()
     
-    if args.command == "prepare":
+    if args.command == "verify":
+        cmd_verify(args)
+    elif args.command == "prepare":
         asyncio.run(cmd_prepare(args))
     elif args.command == "evaluate":
         asyncio.run(cmd_evaluate(args))

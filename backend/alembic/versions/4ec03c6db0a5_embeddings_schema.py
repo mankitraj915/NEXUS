@@ -5,18 +5,18 @@ Revises: 992b62380ba8
 Create Date: 2026-08-20 02:32:12.210865
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+from pgvector.sqlalchemy import Vector
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
-import pgvector
 
 # revision identifiers, used by Alembic.
 revision: str = '4ec03c6db0a5'
-down_revision: Union[str, Sequence[str], None] = '992b62380ba8'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '992b62380ba8'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -39,7 +39,7 @@ def upgrade() -> None:
     sa.Column('chunk_id', sa.Uuid(), nullable=False),
     sa.Column('model_name', sa.String(), nullable=False),
     sa.Column('model_version', sa.String(), nullable=False),
-    sa.Column('embedding', pgvector.sqlalchemy.vector.VECTOR(dim=384), nullable=False),
+    sa.Column('embedding', Vector(384), nullable=False),
     sa.ForeignKeyConstraint(['chunk_id'], ['document_chunks.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('chunk_id')

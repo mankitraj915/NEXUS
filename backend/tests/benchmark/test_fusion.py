@@ -33,5 +33,8 @@ def test_rrf():
     assert fused[1].document_id == "doc3"
     assert fused[2].document_id == "doc2"
 
+    assert fused[0].rrf_score is not None
+    assert fused[1].rrf_score is not None
+    assert fused[2].rrf_score is not None
     assert fused[0].rrf_score > fused[1].rrf_score
     assert fused[1].rrf_score > fused[2].rrf_score

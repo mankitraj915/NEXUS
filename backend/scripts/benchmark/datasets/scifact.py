@@ -26,7 +26,7 @@ class SciFactDataset(DatasetProvider):
         
         if not os.path.exists(data_dir):
             print("Downloading SciFact dataset...")
-            ssl._create_default_https_context = ssl._create_unverified_context
+            ssl._create_default_https_context = ssl._create_unverified_context  # type: ignore[assignment]
             urllib.request.urlretrieve(self.url, zip_path)
             print("Extracting...")
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
@@ -49,17 +49,17 @@ class SciFactDataset(DatasetProvider):
         qrels_path = os.path.join(self.cache_dir, "scifact", "qrels", qrels_file)
         if not os.path.exists(qrels_path):
             raise FileNotFoundError(f"Qrels file for split '{split}' not found at {qrels_path}")
-        qrels = {}
+        qrels: dict[str, dict[str, int]] = {}
         with open(qrels_path, encoding="utf-8") as f:
-            header = f.readline() # skip header
+            f.readline()  # skip header
             for line in f:
                 parts = line.strip().split('\t')
                 if len(parts) != 3:
                     continue
-                qid, docid, score = parts
-                qid = str(qid)
-                docid = str(docid)
-                score = int(score)
+                qid_str, docid_str, score_str = parts
+                qid = str(qid_str)
+                docid = str(docid_str)
+                score = int(score_str)
                 if qid not in qrels:
                     qrels[qid] = {}
                 qrels[qid][docid] = score

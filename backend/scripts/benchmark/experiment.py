@@ -1,17 +1,17 @@
 
 class ExperimentTracker:
-    def __init__(self):
-        self.metrics = {
+    def __init__(self) -> None:
+        self.metrics: dict[str, list[float]] = {
             "ndcg@5": [], "ndcg@10": [],
             "recall@5": [], "recall@10": [], "recall@20": [], "recall@100": [],
             "mrr": [],
             "latency": []
         }
         
-    def add_latency(self, latency_ms: float):
+    def add_latency(self, latency_ms: float) -> None:
         self.metrics["latency"].append(latency_ms)
         
-    def add_metrics(self, ext_ids: list[str], qrels: dict[str, int]):
+    def add_metrics(self, ext_ids: list[str], qrels: dict[str, int]) -> None:
         from scripts.benchmark.metrics import mrr, ndcg_at_k, recall_at_k
         self.metrics["ndcg@5"].append(ndcg_at_k(ext_ids, qrels, k=5))
         self.metrics["ndcg@10"].append(ndcg_at_k(ext_ids, qrels, k=10))
@@ -22,9 +22,11 @@ class ExperimentTracker:
         self.metrics["mrr"].append(mrr(ext_ids, qrels))
         
     def get_summary(self) -> dict[str, float]:
-        def avg(l): return sum(l) / len(l) if l else 0
-        def p(l, p_val):
-            if not l: return 0
+        def avg(l: list[float]) -> float:
+            return sum(l) / len(l) if l else 0.0
+        def p(l: list[float], p_val: float) -> float:
+            if not l:
+                return 0.0
             s = sorted(l)
             idx = int(len(s) * p_val)
             return s[min(idx, len(s)-1)]

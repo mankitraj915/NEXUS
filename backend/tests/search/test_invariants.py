@@ -120,6 +120,7 @@ def test_rrf_rank_contribution_formula():
     fused = reciprocal_rank_fusion([cand_lex], [cand_dense], k=k)
     assert len(fused) == 1
     expected_score = (1.0 / (k + 1)) + (1.0 / (k + 2))
+    assert fused[0].rrf_score is not None
     assert math.isclose(fused[0].rrf_score, expected_score, rel_tol=1e-6)
 
 
@@ -146,7 +147,8 @@ def test_rrf_deterministic_ordering():
     ]
 
     fused = reciprocal_rank_fusion(bm25, dense, k=60)
-    scores = [c.rrf_score for c in fused]
+    assert all(c.rrf_score is not None for c in fused)
+    scores: list[float] = [c.rrf_score for c in fused if c.rrf_score is not None]
     # Scores must be sorted descending
     assert scores == sorted(scores, reverse=True)
 

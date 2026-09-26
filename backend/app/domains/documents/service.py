@@ -1,5 +1,6 @@
 import hashlib
 import uuid
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +19,7 @@ async def save_document(
     canonical_url: str,
     source_domain: str,
     text: str,
-    metadata: dict[str, str],
+    metadata: dict[str, Any],
 ) -> DocumentVersion:
     stmt = select(Document).where(
         Document.project_id == project_id, Document.canonical_url == canonical_url

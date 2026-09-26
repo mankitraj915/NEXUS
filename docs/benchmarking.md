@@ -71,17 +71,30 @@ For each experiment configuration:
 
 Implementations are in [`scripts/benchmark/metrics.py`](../backend/scripts/benchmark/metrics.py), with 5 dedicated unit tests in [`tests/benchmark/test_metrics.py`](../backend/tests/benchmark/test_metrics.py).
 
-## Baseline experiments
+## Baseline experiments & measured results
 
-The standard evaluation runs three configurations:
+The standard evaluation on the SciFact 300-query test split:
 
-| Configuration | Mode | BM25 Depth | Dense Depth | RRF k |
-|---|---|---:|---:|---:|
-| BM25 (lexical only) | `lexical` | 100 | 0 | — |
-| Dense (semantic only) | `dense` | 0 | 100 | — |
-| Fixed Hybrid (production baseline) | `hybrid_fixed` | 100 | 100 | 10 |
+| Configuration | Mode | BM25 Depth | Dense Depth | RRF k | NDCG@10 | Recall@100 | Latency P95 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| BM25 (lexical only) | `lexical` | 100 | 0 | — | 0.6736 | 0.9064 | 192.81 ms |
+| Dense (semantic only) | `dense` | 0 | 100 | — | 0.6642 | 0.9277 | 212.57 ms |
+| RRF (k=60) | `hybrid_fixed` | 100 | 100 | 60 | 0.7043 | 0.9577 | 282.16 ms |
+| RRF (k=30) | `hybrid_fixed` | 100 | 100 | 30 | 0.7137 | 0.9577 | 308.01 ms |
+| Fixed Hybrid Baseline (k=10) | `hybrid_fixed` | 100 | 100 | 10 | **0.7188** | **0.9577** | 313.14 ms |
 
 ## Reproducing the benchmark
+
+### 1. Instant Hermetic Verification (< 0.2s — no DB or external downloads required)
+
+A reviewer can immediately verify all metric computations, RRF mathematics, and text analyzer invariants offline:
+
+```bash
+cd backend
+uv run python -m scripts.benchmark verify
+```
+
+### 2. Full Live Database Benchmark (requires containerized PostgreSQL + pgvector)
 
 ```bash
 cd backend

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class EmbeddingProvider(ABC):
@@ -28,15 +29,21 @@ class EmbeddingProvider(ABC):
 
 class LocalSentenceTransformerProvider(EmbeddingProvider):
     def __init__(self, model_name_or_path: str = "all-MiniLM-L6-v2"):
-        from sentence_transformers import SentenceTransformer
-
         self._model_name = model_name_or_path
-        self._model = SentenceTransformer(model_name_or_path)
+        self._model: Any = None
+
+    def _get_model(self):
+        if self._model is None:
+            from sentence_transformers import SentenceTransformer
+
+            self._model = SentenceTransformer(self._model_name)
+        return self._model
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        embeddings = self._model.encode(
+        model = self._get_model()
+        embeddings = model.encode(
             texts, batch_size=32, convert_to_numpy=True, normalize_embeddings=True
         )
         return embeddings.tolist()
@@ -44,7 +51,8 @@ class LocalSentenceTransformerProvider(EmbeddingProvider):
     def embed_query(self, text: str) -> list[float]:
         if not text:
             return []
-        embedding = self._model.encode(
+        model = self._get_model()
+        embedding = model.encode(
             [text], convert_to_numpy=True, normalize_embeddings=True
         )[0]
         return embedding.tolist()

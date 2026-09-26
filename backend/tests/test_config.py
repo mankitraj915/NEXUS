@@ -13,7 +13,7 @@ def clear_env(monkeypatch):
 
 def test_missing_key_fails(clear_env):
     # Test 1: No key -> missing configuration
-    settings = Settings(_env_file=None)
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
     with pytest.raises(ValueError, match="OPENAI_API_KEY is not configured"):
         # We need to monkeypatch the global settings used by validate_configuration
         import app.domains.search.query.llm_provider as provider_module
@@ -25,7 +25,7 @@ def test_missing_key_fails(clear_env):
 def test_environment_key_works(clear_env, monkeypatch):
     # Test 2: Environment key -> works
     monkeypatch.setenv("OPENAI_API_KEY", "env-key")
-    settings = Settings(_env_file=None)
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
     import app.domains.search.query.llm_provider as provider_module
 
@@ -43,7 +43,7 @@ def test_env_file_works(clear_env, tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text("OPENAI_API_KEY=file-key\n")
 
-    settings = Settings(_env_file=str(env_file))
+    settings = Settings(_env_file=str(env_file))  # type: ignore[call-arg]
 
     import app.domains.search.query.llm_provider as provider_module
 
@@ -61,7 +61,7 @@ def test_environment_overrides_env_file(clear_env, tmp_path, monkeypatch):
     env_file = tmp_path / ".env"
     env_file.write_text("OPENAI_API_KEY=file-key\n")
 
-    settings = Settings(_env_file=str(env_file))
+    settings = Settings(_env_file=str(env_file))  # type: ignore[call-arg]
 
     import app.domains.search.query.llm_provider as provider_module
 
@@ -74,7 +74,7 @@ def test_environment_overrides_env_file(clear_env, tmp_path, monkeypatch):
 
 def test_whitespace_key_rejected(clear_env):
     # Test 5: Whitespace-only key fails validation
-    settings = Settings(OPENAI_API_KEY="   ", _env_file=None)
+    settings = Settings(OPENAI_API_KEY="   ", _env_file=None)  # type: ignore[call-arg]
 
     import app.domains.search.query.llm_provider as provider_module
 
@@ -86,7 +86,7 @@ def test_whitespace_key_rejected(clear_env):
 
 def test_provider_does_not_log_secrets(clear_env, caplog):
     # Test 6: Provider initialization does not log secrets
-    settings = Settings(OPENAI_API_KEY="super-secret-key", _env_file=None)
+    settings = Settings(OPENAI_API_KEY="super-secret-key", _env_file=None)  # type: ignore[call-arg]
 
     import app.domains.search.query.llm_provider as provider_module
 

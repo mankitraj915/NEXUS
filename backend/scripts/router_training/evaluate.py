@@ -59,7 +59,7 @@ def get_oracle_label(outcomes, epsilon):
     return best_action
 
 def evaluate_predictions(y_pred, records, test_idx):
-    res = {
+    res: dict[str, list[float]] = {
         "ndcg_5": [], "ndcg_10": [], "recall_10": [], "recall_100": [], "mrr": [],
         "lat_median": [], "lat_p75": [], "lat_p95_run": [], 
         "bm25_depth": [], "dense_depth": []
@@ -145,27 +145,25 @@ def main():
         print("No records.")
         return
         
-    feat_keys = sorted(list(records[0]["features"].keys()))
+    feat_keys = sorted(records[0]["features"].keys())
     X = np.array([[r["features"].get(k, 0.0) for k in feat_keys] for r in records])
     groups = np.array([r["query_id"] for r in records])
     
     # Generate labels
-    y_oracle_b_0025 = np.array([get_oracle_label(r["outcomes"], 0.0025) for r in records])
     y_oracle_b_005 = np.array([get_oracle_label(r["outcomes"], 0.005) for r in records])
-    y_oracle_b_01 = np.array([get_oracle_label(r["outcomes"], 0.01) for r in records])
     
-    y_oracle_a = []
+    y_oracle_a_list: list[int] = []
     for r in records:
-        b_ndcg = -1
+        b_ndcg = -1.0
         b_lat = float('inf')
         b_act = 0
-        for cfg, res in r["outcomes"].items():
-            if res["ndcg_10"] > b_ndcg or (res["ndcg_10"] == b_ndcg and res["median_latency_ms"] < b_lat):
-                b_ndcg = res["ndcg_10"]
-                b_lat = res["median_latency_ms"]
+        for cfg, res_out in r["outcomes"].items():
+            if res_out["ndcg_10"] > b_ndcg or (res_out["ndcg_10"] == b_ndcg and res_out["median_latency_ms"] < b_lat):
+                b_ndcg = res_out["ndcg_10"]
+                b_lat = res_out["median_latency_ms"]
                 b_act = CONFIG_NAMES[cfg]
-        y_oracle_a.append(b_act)
-    y_oracle_a = np.array(y_oracle_a)
+        y_oracle_a_list.append(b_act)
+    y_oracle_a = np.array(y_oracle_a_list)
     
     y_rule_based = np.array([CONFIG_NAMES[simulate_rule_based_router(r["features"])] for r in records])
     y_fixed = np.zeros(len(records), dtype=int)

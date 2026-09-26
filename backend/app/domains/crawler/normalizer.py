@@ -10,7 +10,7 @@ def normalize_url(url: str) -> str:
     """
     try:
         parsed = urllib.parse.urlparse(url)
-    except Exception:
+    except ValueError:
         return url
 
     scheme = parsed.scheme.lower()

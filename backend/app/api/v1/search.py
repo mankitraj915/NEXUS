@@ -12,7 +12,7 @@ from app.domains.search.schemas import SearchMode, SearchResponse, SearchResultI
 router = APIRouter(tags=["Search"])
 
 
-async def get_project(db: AsyncSession, project_id: uuid.UUID):
+async def get_project(db: AsyncSession, project_id: uuid.UUID) -> Project | None:
     stmt = select(Project).where(Project.id == project_id)
     return (await db.execute(stmt)).scalars().first()
 
@@ -33,7 +33,6 @@ async def search(
         25, ge=1, le=100, description="Number of candidates to neural rerank"
     ),
     rrf_k: int = Query(60, ge=1, le=200, description="RRF constant"),
-    debug: bool = Query(False, description="Enable query analysis diagnostics"),
     db: AsyncSession = Depends(get_db),
 ):
     project = await get_project(db, project_id)

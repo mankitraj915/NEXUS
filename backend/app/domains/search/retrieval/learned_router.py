@@ -1,12 +1,11 @@
 import logging
-import os
 import pickle
+from pathlib import Path
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# The specific action space mapping
 ACTIONS = {
     0: {"name": "CONFIG_A", "bm25": 100, "dense": 100},
     1: {"name": "CONFIG_B", "bm25": 100, "dense": 25},
@@ -28,23 +27,20 @@ class FixedRoutingModel(RoutingModel):
 
 
 class LearnedRoutingModel(RoutingModel):
-    def __init__(self, model_path: str | None = None):
+    def __init__(self, model_path: str | Path | None = None):
         if model_path is None:
-            # Default to the training output location for now
-            base_dir = os.path.dirname(
-                os.path.dirname(
-                    os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-                )
-            )
-            model_path = os.path.join(
-                base_dir, "scripts", "router_training", "router.pkl"
+            model_path = (
+                Path(__file__).resolve().parents[4]
+                / "scripts"
+                / "router_training"
+                / "router.pkl"
             )
 
         try:
             with open(model_path, "rb") as f:
                 self.model, self.feature_keys = pickle.load(f)
             self.ready = True
-        except Exception as e:
+        except (OSError, pickle.PickleError, AttributeError, ValueError) as e:
             logger.error(f"Failed to load LearnedRoutingModel from {model_path}: {e}")
             self.ready = False
 
@@ -71,9 +67,8 @@ class LearnedRoutingModel(RoutingModel):
             return FixedRoutingModel().predict(features)
 
 
-# Global singleton
 _learned_router = LearnedRoutingModel()
 
 
-def get_learned_router():
+def get_learned_router() -> RoutingModel:
     return _learned_router

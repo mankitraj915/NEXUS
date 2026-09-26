@@ -27,7 +27,7 @@ class LocalCrossEncoderReranker(RerankerProvider):
         self.model = None
         self.max_length = max_length
 
-    def _load_model(self):
+    def _load_model(self) -> None:
         if self.model is None:
             logger.info(f"Loading CrossEncoder: {self.model_name} on {self.device}")
             self.model = CrossEncoder(
@@ -43,7 +43,6 @@ class LocalCrossEncoderReranker(RerankerProvider):
         self._load_model()
         assert self.model is not None
 
-        # Policy: prefer dense_passage, fallback to bm25_passage
         pairs = []
         for c in candidates:
             passage = c.dense_passage if c.dense_passage else c.bm25_passage
@@ -51,16 +50,13 @@ class LocalCrossEncoderReranker(RerankerProvider):
                 passage = c.snippet if c.snippet else ""
             pairs.append((query, passage))
 
-        # CrossEncoder scores
         scores = self.model.predict(pairs, show_progress_bar=False)
 
         for i, c in enumerate(candidates):
             c.reranker_score = float(scores[i])
 
-        # Sort descending by reranker_score
         candidates.sort(key=lambda x: x.reranker_score or 0.0, reverse=True)
 
-        # Assign final ranks
         for i, c in enumerate(candidates):
             c.final_rank = i + 1
 

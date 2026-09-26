@@ -1,7 +1,9 @@
 import math
 
 
-def precision_at_k(retrieved_ids: list[str], qrels: dict[str, int], k: int, threshold: int = 1) -> float:
+def precision_at_k(
+    retrieved_ids: list[str], qrels: dict[str, int], k: int, threshold: int = 1
+) -> float:
     """
     Calculate Precision@K.
     A document is considered relevant if its score in qrels >= threshold.
@@ -9,10 +11,15 @@ def precision_at_k(retrieved_ids: list[str], qrels: dict[str, int], k: int, thre
     if not retrieved_ids:
         return 0.0
     k_retrieved = retrieved_ids[:k]
-    relevant_retrieved = sum(1 for doc_id in k_retrieved if qrels.get(doc_id, 0) >= threshold)
+    relevant_retrieved = sum(
+        1 for doc_id in k_retrieved if qrels.get(doc_id, 0) >= threshold
+    )
     return relevant_retrieved / k
 
-def recall_at_k(retrieved_ids: list[str], qrels: dict[str, int], k: int, threshold: int = 1) -> float:
+
+def recall_at_k(
+    retrieved_ids: list[str], qrels: dict[str, int], k: int, threshold: int = 1
+) -> float:
     """
     Calculate Recall@K.
     A document is considered relevant if its score in qrels >= threshold.
@@ -23,8 +30,11 @@ def recall_at_k(retrieved_ids: list[str], qrels: dict[str, int], k: int, thresho
     if not retrieved_ids:
         return 0.0
     k_retrieved = retrieved_ids[:k]
-    relevant_retrieved = sum(1 for doc_id in k_retrieved if qrels.get(doc_id, 0) >= threshold)
+    relevant_retrieved = sum(
+        1 for doc_id in k_retrieved if qrels.get(doc_id, 0) >= threshold
+    )
     return relevant_retrieved / total_relevant
+
 
 def mrr(retrieved_ids: list[str], qrels: dict[str, int], threshold: int = 1) -> float:
     """
@@ -37,6 +47,7 @@ def mrr(retrieved_ids: list[str], qrels: dict[str, int], threshold: int = 1) -> 
             return 1.0 / (idx + 1)
     return 0.0
 
+
 def dcg_at_k(retrieved_ids: list[str], qrels: dict[str, int], k: int) -> float:
     """
     Calculate Discounted Cumulative Gain at K using graded relevance.
@@ -47,8 +58,9 @@ def dcg_at_k(retrieved_ids: list[str], qrels: dict[str, int], k: int) -> float:
     for idx, doc_id in enumerate(k_retrieved):
         rel = qrels.get(doc_id, 0)
         if rel > 0:
-            dcg += (2 ** rel - 1) / math.log2(idx + 2)
+            dcg += (2**rel - 1) / math.log2(idx + 2)
     return dcg
+
 
 def ndcg_at_k(retrieved_ids: list[str], qrels: dict[str, int], k: int) -> float:
     """
@@ -57,12 +69,15 @@ def ndcg_at_k(retrieved_ids: list[str], qrels: dict[str, int], k: int) -> float:
     """
     actual_dcg = dcg_at_k(retrieved_ids, qrels, k)
     # Ideal DCG: sort all qrels by relevance descending
-    ideal_ranking = sorted([doc_id for doc_id in qrels], key=lambda d: qrels[d], reverse=True)
+    ideal_ranking = sorted(
+        [doc_id for doc_id in qrels], key=lambda d: qrels[d], reverse=True
+    )
     ideal_dcg = dcg_at_k(ideal_ranking, qrels, k)
-    
+
     if ideal_dcg == 0.0:
         return 0.0
     return actual_dcg / ideal_dcg
+
 
 def jaccard_at_k(list_a: list[str], list_b: list[str], k: int) -> float:
     """

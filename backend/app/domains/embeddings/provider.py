@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 
 class EmbeddingProvider(ABC):
@@ -30,9 +33,9 @@ class EmbeddingProvider(ABC):
 class LocalSentenceTransformerProvider(EmbeddingProvider):
     def __init__(self, model_name_or_path: str = "all-MiniLM-L6-v2"):
         self._model_name = model_name_or_path
-        self._model: Any = None
+        self._model: SentenceTransformer | None = None
 
-    def _get_model(self):
+    def _get_model(self) -> "SentenceTransformer":
         if self._model is None:
             from sentence_transformers import SentenceTransformer
 

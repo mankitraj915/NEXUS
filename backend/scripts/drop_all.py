@@ -13,5 +13,6 @@ async def main():
         await conn.run_sync(Base.metadata.drop_all)
         await conn.execute(text("DROP TABLE IF EXISTS alembic_version CASCADE;"))
 
+
 if __name__ == "__main__":
     asyncio.run(main())

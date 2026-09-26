@@ -39,7 +39,7 @@ async def _can_fetch_robots(
         resp = await client.get(robots_url, timeout=5.0)
         if resp.status_code == 200:
             rp.parse(resp.text.splitlines())
-    except Exception:
+    except httpx.HTTPError:
         pass
 
     _ROBOTS_CACHE[robots_url] = rp
@@ -76,5 +76,7 @@ async def fetch_url(url: str, respect_robots: bool = True) -> FetchResult:
             return FetchResult(
                 url=str(resp.url), status_code=resp.status_code, html=resp.text
             )
-        except Exception as e:
+        except SSRFViolation as e:
+            return FetchResult(url=url, status_code=0, error=f"SSRF blocked: {e!s}")
+        except httpx.HTTPError as e:
             return FetchResult(url=url, status_code=0, error=str(e))

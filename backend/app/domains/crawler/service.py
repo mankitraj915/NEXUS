@@ -44,7 +44,7 @@ async def create_job(db: AsyncSession, job_in: CrawlJobCreate) -> CrawlJob:
     return job
 
 
-async def get_job_stats(db: AsyncSession, job_id: uuid.UUID) -> dict:
+async def get_job_stats(db: AsyncSession, job_id: uuid.UUID) -> dict[str, int | None]:
     stmt_total = select(func.count(CrawlTarget.id)).where(CrawlTarget.job_id == job_id)
     stmt_success = select(func.count(CrawlTarget.id)).where(
         CrawlTarget.job_id == job_id, CrawlTarget.status == "SUCCESS"
@@ -60,7 +60,7 @@ async def get_job_stats(db: AsyncSession, job_id: uuid.UUID) -> dict:
     return {"discovered": total, "fetched": success, "failed": failed}
 
 
-async def _crawl_worker(job_id: uuid.UUID, semaphore: asyncio.Semaphore):
+async def _crawl_worker(job_id: uuid.UUID, semaphore: asyncio.Semaphore) -> None:
     async with AsyncSessionLocal() as db:
         stmt = select(CrawlJob).where(CrawlJob.id == job_id)
         job = (await db.execute(stmt)).scalars().first()
@@ -124,6 +124,6 @@ async def _crawl_worker(job_id: uuid.UUID, semaphore: asyncio.Semaphore):
         await db.commit()
 
 
-def start_crawl_background(job_id: uuid.UUID, concurrency_limit: int = 5):
+def start_crawl_background(job_id: uuid.UUID, concurrency_limit: int = 5) -> None:
     semaphore = asyncio.Semaphore(concurrency_limit)
     asyncio.create_task(_crawl_worker(job_id, semaphore))

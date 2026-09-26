@@ -61,7 +61,6 @@ async def save_document(
     await db.commit()
     await db.refresh(version)
 
-    # Trigger indexing for MVP
     await index_document_version(db, version.id)
 
     from app.domains.embeddings.pipeline import process_document_version

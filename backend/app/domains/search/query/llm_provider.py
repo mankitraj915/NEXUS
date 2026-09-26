@@ -144,5 +144,4 @@ class OpenAICompatibleProvider(LLMProvider):
 
         except Exception as e:
             logger.error(f"LLM Generation failed: {e}")
-            # Mock fallback for quota limits to allow evaluation to complete
-            return [{"query": prompt + " (fallback)", "is_accepted": True}]
+            return []

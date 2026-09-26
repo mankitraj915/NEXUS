@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 provider = LocalSentenceTransformerProvider()
 
 
-async def process_document_version(db: AsyncSession, version_id: uuid.UUID):
+async def process_document_version(db: AsyncSession, version_id: uuid.UUID) -> None:
     """
     Called after DocumentVersion is saved. Segments the document into chunks deterministically.
     """
@@ -77,7 +77,6 @@ async def process_pending_chunks(db: AsyncSession, batch_size: int = 32) -> int:
         logger.error(f"Failed to embed batch: {e}")
         await db.rollback()
 
-        # Mark as FAILED so we don't infinitely retry in this MVP
         for chunk in chunks:
             chunk.status = "FAILED"
             db.add(chunk)

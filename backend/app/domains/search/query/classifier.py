@@ -5,11 +5,9 @@ from app.domains.search.query.models import QueryClasses, QueryFeatures
 def classify_query(features: QueryFeatures) -> QueryClasses:
     classes = QueryClasses()
 
-    # Thresholds (would ideally come from settings)
     TH_LEXICAL_HIGH = getattr(settings, "QUERY_ROUTING_LEXICAL_HIGH", 0.5)
     TH_IDENTIFIER_HIGH = getattr(settings, "QUERY_ROUTING_IDENTIFIER_HIGH", 0.3)
     TH_NL_HIGH = getattr(settings, "QUERY_ROUTING_NL_HIGH", 0.5)
-    getattr(settings, "QUERY_ROUTING_TECHNICAL_HIGH", 0.3)
 
     # 1. Exact Term
     if features.quoted_term_density > 0.5 or (

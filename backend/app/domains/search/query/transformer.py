@@ -1,6 +1,5 @@
 import hashlib
-import json
-import os
+import logging
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 
@@ -9,6 +8,8 @@ from app.domains.search.query.drift import SemanticDriftFilter
 from app.domains.search.query.features import CONJUNCTIONS, STOP_WORDS
 from app.domains.search.query.llm_provider import LLMProvider
 from app.domains.search.query.models import QueryVariant
+
+logger = logging.getLogger(__name__)
 
 
 class QueryTransformer(ABC):
@@ -81,36 +82,6 @@ class RuleBasedQueryTransformer(QueryTransformer):
                     break  # Just split once for simplicity
 
         return variants
-
-
-class TransformationCache:
-    def __init__(self, cache_file=".cache/transformations.json"):
-        self.cache_file = cache_file
-        self.cache = {}
-        if os.path.exists(self.cache_file):
-            try:
-                with open(self.cache_file, "r") as f:
-                    self.cache = json.load(f)
-            except Exception:
-                pass
-
-    def get(self, query: str, generator_version: str) -> list[QueryVariant] | None:
-        key = hashlib.md5((query + generator_version).encode()).hexdigest()
-        if key in self.cache:
-            data = self.cache[key]
-            return [QueryVariant(**v) for v in data]
-        return None
-
-    def set(self, query: str, generator_version: str, variants: list[QueryVariant]):
-        key = hashlib.md5((query + generator_version).encode()).hexdigest()
-        self.cache[key] = [v.model_dump() for v in variants]
-        # Very simple flush to disk
-        os.makedirs(os.path.dirname(self.cache_file), exist_ok=True)
-        with open(self.cache_file, "w") as f:
-            # Pydantic v2 datetimes need custom serialization in json.dump,
-            # but model_dump(mode='json') handles it. Let's do that.
-            self.cache[key] = [v.model_dump(mode="json") for v in variants]
-            json.dump(self.cache, f)
 
 
 class LLMQueryTransformer(QueryTransformer):
@@ -197,7 +168,10 @@ Original query: {query}
             raw_variants = await self.provider.generate_variants(
                 prompt, self.max_variants
             )
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                f"LLM query transformation failed, using original query: {e}"
+            )
             return [original_variant]
 
         # Validation & deduplication

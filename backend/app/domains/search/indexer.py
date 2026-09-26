@@ -13,7 +13,7 @@ from app.domains.search.models import DocumentStats, Posting, ProjectStats, Term
 logger = logging.getLogger(__name__)
 
 
-async def index_document_version(db: AsyncSession, version_id: uuid.UUID):
+async def index_document_version(db: AsyncSession, version_id: uuid.UUID) -> None:
     stmt = (
         select(DocumentVersion, Document.project_id)
         .join(Document)
@@ -52,7 +52,7 @@ async def index_document_version(db: AsyncSession, version_id: uuid.UUID):
             tf[token] += 1
             positions[token].append(pos)
 
-        # 3. Update Project Stats (Upsert)
+        # Upsert ProjectStats
         proj_stmt = (
             insert(ProjectStats)
             .values(project_id=project_id, total_documents=1, total_tokens=token_count)
@@ -66,7 +66,7 @@ async def index_document_version(db: AsyncSession, version_id: uuid.UUID):
         )
         await db.execute(proj_stmt)
 
-        # 4. Upsert Terms and Create Postings
+        # Upsert Terms and create Posting rows
         if tf:
             term_values = [
                 {"project_id": project_id, "term": term_str, "document_frequency": 1}
@@ -98,7 +98,6 @@ async def index_document_version(db: AsyncSession, version_id: uuid.UUID):
             if postings_data:
                 await db.execute(insert(Posting).values(postings_data))
 
-        # 5. Update DocumentStats
         doc_stats.token_count = token_count
         doc_stats.status = "INDEXED"
 

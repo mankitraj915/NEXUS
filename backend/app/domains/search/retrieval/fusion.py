@@ -10,7 +10,6 @@ def reciprocal_rank_fusion(
     """
     union_map: dict[str, Candidate] = {}
 
-    # Process BM25 candidates
     for c in bm25_candidates:
         if c.document_id not in union_map:
             union_map[c.document_id] = Candidate(
@@ -20,11 +19,9 @@ def reciprocal_rank_fusion(
         target.bm25_rank = c.bm25_rank
         target.bm25_score = c.bm25_score
         target.bm25_passage = c.bm25_passage
-        # Default snippet to BM25 if it's the first we see
         if target.snippet is None:
             target.snippet = c.snippet
 
-    # Process Dense candidates
     for c in dense_candidates:
         if c.document_id not in union_map:
             union_map[c.document_id] = Candidate(
@@ -35,10 +32,9 @@ def reciprocal_rank_fusion(
         target.dense_score = c.dense_score
         target.dense_chunk_id = c.dense_chunk_id
         target.dense_passage = c.dense_passage
-        # Overwrite/set snippet to Dense chunk text, since Dense is usually a highly focused chunk
+        # Dense chunk text provides more focused passage context than full document snippet
         target.snippet = c.snippet
 
-    # Compute RRF score
     results = list(union_map.values())
     for c in results:
         rrf = 0.0
@@ -48,10 +44,8 @@ def reciprocal_rank_fusion(
             rrf += 1.0 / (k + c.dense_rank)
         c.rrf_score = rrf
 
-    # Sort descending by rrf_score
     results.sort(key=lambda x: x.rrf_score or 0.0, reverse=True)
 
-    # Assign final ranks
     for i, c in enumerate(results):
         c.final_rank = i + 1
 

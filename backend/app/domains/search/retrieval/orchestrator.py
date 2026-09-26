@@ -139,9 +139,7 @@ async def execute_search(
         analysis = QueryAnalysis(
             raw_query=query,
             normalized_query=query,
-            features=QueryFeatures(
-                token_count=len(variants)
-            ),  # hack to track variant count in benchmark
+            features=QueryFeatures(token_count=len(variants)),
             classes=QueryClasses(),
         )
         return (res, analysis) if return_analysis else res
@@ -207,12 +205,11 @@ async def execute_search(
         analysis = QueryAnalysis(
             raw_query=query,
             normalized_query=query,
-            features=QueryFeatures(token_count=len(variants)),  # track variant count
+            features=QueryFeatures(token_count=len(variants)),
             classes=QueryClasses(),
         )
         return (res, analysis) if return_analysis else res
 
-    # Single-query Parallel Retrieval
     bm25_task = None
     dense_task = None
 
@@ -276,7 +273,7 @@ async def execute_search(
         except Exception as e:
             logger.error(f"BM25 retrieval failed: {e}")
             if mode == "lexical":
-                return []
+                return ([], analysis) if return_analysis else []
 
     if dense_task:
         try:
@@ -284,14 +281,13 @@ async def execute_search(
         except Exception as e:
             logger.error(f"Dense retrieval failed: {e}")
             if mode == "dense":
-                return []
+                return ([], analysis) if return_analysis else []
 
     if mode == "lexical":
         return (bm25_candidates, analysis) if return_analysis else bm25_candidates
     elif mode == "dense":
         return (dense_candidates, analysis) if return_analysis else dense_candidates
 
-    # Hybrid fusion
     fused_candidates = []
     try:
         fused_candidates = reciprocal_rank_fusion(
@@ -306,13 +302,10 @@ async def execute_search(
         res = fused_candidates[:top_k]
         return (res, analysis) if return_analysis else res
 
-    # Reranking
     if mode == "hybrid_rerank":
         try:
-            # We rerank top `rerank_k` from the fused list
             candidates_to_rerank = fused_candidates[:rerank_k]
             reranked = _reranker.rerank(query, candidates_to_rerank, top_k=top_k)
-            # Maintain project isolation: this is strictly applied on the fused candidates
             return (reranked, analysis) if return_analysis else reranked
         except Exception as e:
             logger.error(f"Reranker failed: {e}")

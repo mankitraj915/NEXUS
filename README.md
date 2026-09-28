@@ -196,15 +196,81 @@ Status: 100% PASS (5/5 invariants)
 ```bash
 cd backend
 
-# Static analysis across all 80 source files (0 errors, 100% clean)
+# Static analysis across all 81 source files (0 errors, 100% clean)
 uv run ruff check .
 uv run mypy .
 
-# Run test suite (38 hermetic unit & invariant tests pass instantly)
+# Run test suite (45 hermetic unit & invariant tests pass cleanly)
 uv run pytest tests/ -v
 ```
 
-### 3. Full Benchmark Execution (Requires Docker)
+### 3. Local Development Quickstart (Zero to Running Search)
+
+Follow this 10-step sequence to get from a fresh clone to an active local search engine:
+
+1. **Prerequisites**: Ensure Python `>=3.12`, [Docker Desktop](https://www.docker.com/), and [uv](https://docs.astral.sh/uv/) are installed.
+2. **Clone & Setup**:
+   ```bash
+   git clone https://github.com/ankitraj/nexus.git
+   cd NEXUS
+   ```
+3. **Install Dependencies**:
+   ```bash
+   cd backend
+   uv sync --all-groups
+   ```
+4. **Configure Environment**:
+   ```bash
+   cp .env.example .env
+   ```
+   *(Defaults are pre-configured for local development with PostgreSQL on host port 5433).*
+5. **Start Infrastructure**:
+   ```bash
+   docker compose up -d
+   ```
+   *(Starts containerized PostgreSQL 16 + pgvector on host port 5433 with healthy readiness checks. Service name: `postgres`).*
+6. **Apply Schema Migrations**:
+   ```bash
+   uv run alembic upgrade head
+   ```
+7. **Verify Installation & Seed Demo Data**:
+   ```bash
+   uv run python -m scripts.dev_smoke --seed
+   ```
+   *(Executes hermetic smoke tests across DB connection, pgvector extension, table schemas, document ingestion, and search, then seeds a persistent local demo project).*
+8. **Start Backend API Server**:
+   ```bash
+   uv run uvicorn app.main:app --port 8000
+   ```
+9. **Interface & Documentation**:
+   NEXUS exposes a FastAPI REST API. Interactive OpenAPI documentation (Swagger UI) is available at:
+   - **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+   - **OpenAPI Schema**: [http://127.0.0.1:8000/api/v1/openapi.json](http://127.0.0.1:8000/api/v1/openapi.json)
+   *(No external frontend package is present or required).*
+10. **Execute First Search**:
+    Query the seeded demo project using PowerShell or curl:
+
+    **PowerShell:**
+    ```powershell
+    # Hybrid RRF Search (default k=10)
+    Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/search?project_id=9cd45a55-1687-444f-9f2d-9ff7c99dd507&q=hybrid+search&mode=hybrid_fixed"
+
+    # Lexical BM25 Search
+    Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/search?project_id=9cd45a55-1687-444f-9f2d-9ff7c99dd507&q=bm25&mode=lexical"
+
+    # Dense pgvector Semantic Search
+    Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/search?project_id=9cd45a55-1687-444f-9f2d-9ff7c99dd507&q=semantic+embeddings&mode=dense"
+    ```
+
+    **curl:**
+    ```bash
+    curl -G "http://127.0.0.1:8000/api/v1/search" \
+      --data-urlencode "project_id=9cd45a55-1687-444f-9f2d-9ff7c99dd507" \
+      --data-urlencode "q=hybrid search" \
+      --data-urlencode "mode=hybrid_fixed"
+    ```
+
+### 4. Full Benchmark Execution (Requires Docker)
 
 ```bash
 # 1. Start PostgreSQL + pgvector

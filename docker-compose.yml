@@ -1,5 +1,5 @@
 services:
-  db:
+  postgres:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: nexus

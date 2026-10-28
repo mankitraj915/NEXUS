@@ -1,8 +1,13 @@
 import argparse
 import asyncio
 import json
+import os
+import platform
+import subprocess
+import sys
 import time
 import uuid
+from datetime import UTC, datetime
 from typing import TypedDict
 
 from sqlalchemy import func, select
@@ -24,6 +29,91 @@ class BenchmarkExperimentConfig(TypedDict):
     retrieval_k_dense: int | None
     rrf_k: int
     top_k: int
+    rerank_k: int
+
+
+# BEIR's SciFact "test" qrels are the official SciFact *dev* claims (identical IDs and
+# text); the official SciFact test labels are not public.
+SPLIT_DESCRIPTIONS = {
+    "test": (
+        "BEIR SciFact test = official SciFact dev claims (300). RRF k=10 was selected "
+        "on this split, so the k=10 row is a tuned (optimistic) result."
+    ),
+    "train": "BEIR SciFact train = official SciFact train claims (809); not used for tuning.",
+}
+
+DENSE_MODEL_REPO = "sentence-transformers/all-MiniLM-L6-v2"
+RERANKER_MODEL_REPO = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+
+def _cached_revision(repo_id: str) -> str:
+    """Return '<repo>@<commit>' for a model in the local Hugging Face cache."""
+    from huggingface_hub import try_to_load_from_cache
+
+    path = try_to_load_from_cache(repo_id, "config.json")
+    if isinstance(path, str) and "snapshots" in path:
+        return f"{repo_id}@{os.path.basename(os.path.dirname(path))}"
+    return f"{repo_id}@(not cached)"
+
+
+def _cpu_name() -> str:
+    if sys.platform == "win32":
+        import winreg
+
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"HARDWARE\DESCRIPTION\System\CentralProcessor\0",
+            )
+            return str(winreg.QueryValueEx(key, "ProcessorNameString")[0]).strip()
+        except OSError:
+            pass
+    try:
+        with open("/proc/cpuinfo", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("model name"):
+                    return line.split(":", 1)[1].strip()
+    except OSError:
+        pass
+    return platform.processor() or "unknown"
+
+
+def measurement_conditions() -> dict:
+    import sentence_transformers
+    import torch
+
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        if dirty:
+            commit += "-dirty"
+    except (OSError, subprocess.CalledProcessError):
+        commit = "unknown"
+    return {
+        "timestamp_utc": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
+        "git_commit": commit,
+        "platform": platform.platform(),
+        "cpu": _cpu_name(),
+        "logical_cpus": os.cpu_count(),
+        "python": platform.python_version(),
+        "torch": torch.__version__,
+        "torch_threads": torch.get_num_threads(),
+        "sentence_transformers": sentence_transformers.__version__,
+        "models": {
+            "dense": _cached_revision(DENSE_MODEL_REPO),
+            "reranker": _cached_revision(RERANKER_MODEL_REPO),
+        },
+    }
 
 
 async def create_benchmark_project(db: AsyncSession, name: str) -> Project:
@@ -45,6 +135,22 @@ async def create_benchmark_project(db: AsyncSession, name: str) -> Project:
     return project
 
 
+async def benchmark_project_is_complete(
+    project_id: uuid.UUID, corpus_size: int
+) -> bool:
+    async for db in get_db():
+        docs = await db.scalar(
+            select(func.count(Document.id)).where(Document.project_id == project_id)
+        )
+        mappings = await db.scalar(
+            select(func.count(BenchmarkMapping.id)).where(
+                BenchmarkMapping.benchmark_project_id == project_id
+            )
+        )
+        return docs == corpus_size and mappings == corpus_size
+    return False
+
+
 async def cmd_prepare(args: argparse.Namespace) -> None:
     dataset_name = args.dataset
     if dataset_name != "scifact":
@@ -59,13 +165,17 @@ async def cmd_prepare(args: argparse.Namespace) -> None:
         try:
             with open(manifest_path, "r") as f:
                 manifest = json.load(f)
-                if manifest.get("status") == "READY":
-                    print(
-                        f"Benchmark corpus is already READY for project: {manifest['project_id']}"
-                    )
-                    return
         except FileNotFoundError:
-            pass
+            manifest = {}
+        if manifest.get("status") == "READY":
+            project_id = uuid.UUID(manifest["project_id"])
+            if await benchmark_project_is_complete(project_id, manifest["corpus_size"]):
+                print(f"Benchmark corpus is already READY for project: {project_id}")
+                return
+            print(
+                f"Manifest references project {project_id}, but it is missing or "
+                "incomplete in the database. Re-ingesting the corpus."
+            )
 
     async for db in get_db():
         print(
@@ -147,8 +257,6 @@ async def cmd_prepare(args: argparse.Namespace) -> None:
 
 
 async def cmd_evaluate(args: argparse.Namespace) -> None:
-    import os
-
     dataset_name = args.dataset
     split = getattr(args, "split", "test")
     manifest_path = f".cache/{dataset_name}_manifest.json"
@@ -227,6 +335,7 @@ async def cmd_evaluate(args: argparse.Namespace) -> None:
                 "retrieval_k_dense": 0,
                 "rrf_k": 60,
                 "top_k": 100,
+                "rerank_k": 0,
             },
             # 2. Dense
             {
@@ -236,8 +345,19 @@ async def cmd_evaluate(args: argparse.Namespace) -> None:
                 "retrieval_k_dense": 100,
                 "rrf_k": 60,
                 "top_k": 100,
+                "rerank_k": 0,
             },
-            # 3. Fixed Production Baseline (100/100, k=10)
+            # 3. Hybrid with the Cormack et al. default constant, for reference
+            {
+                "name": "Hybrid RRF (100/100, k=60)",
+                "mode": "hybrid_fixed",
+                "retrieval_k_bm25": 100,
+                "retrieval_k_dense": 100,
+                "rrf_k": 60,
+                "top_k": 100,
+                "rerank_k": 0,
+            },
+            # 4. Fixed Production Baseline (100/100, k=10)
             {
                 "name": "Fixed Baseline (100/100, k=10)",
                 "mode": "hybrid_fixed",
@@ -245,8 +365,22 @@ async def cmd_evaluate(args: argparse.Namespace) -> None:
                 "retrieval_k_dense": 100,
                 "rrf_k": 10,
                 "top_k": 100,
+                "rerank_k": 0,
             },
         ]
+        if args.with_rerank:
+            # Optional: CPU cross-encoder reranking of the top 25 fused candidates
+            experiments.append(
+                {
+                    "name": "Baseline + CrossEncoder rerank (top 25)",
+                    "mode": "hybrid_rerank",
+                    "retrieval_k_bm25": 100,
+                    "retrieval_k_dense": 100,
+                    "rrf_k": 10,
+                    "top_k": 25,
+                    "rerank_k": 25,
+                }
+            )
 
         results_map = {}
 
@@ -257,6 +391,19 @@ async def cmd_evaluate(args: argparse.Namespace) -> None:
             tracker = ExperimentTracker()
             count = 0
             total_candidates_sum = 0
+
+            # Unmeasured warm-up so model loading is not counted as query latency
+            await execute_search(
+                db=db,
+                project_id=project_id,
+                query=queries[0]["text"],
+                mode=exp["mode"],
+                top_k=exp["top_k"],
+                retrieval_k_bm25=exp["retrieval_k_bm25"],
+                retrieval_k_dense=exp["retrieval_k_dense"],
+                rerank_k=exp["rerank_k"],
+                rrf_k=exp["rrf_k"],
+            )
 
             for query in queries:
                 qid = query["id"]
@@ -273,7 +420,7 @@ async def cmd_evaluate(args: argparse.Namespace) -> None:
                     top_k=exp["top_k"],
                     retrieval_k_bm25=exp["retrieval_k_bm25"],
                     retrieval_k_dense=exp["retrieval_k_dense"],
-                    rerank_k=0,
+                    rerank_k=exp["rerank_k"],
                     rrf_k=exp["rrf_k"],
                     return_analysis=False,
                 )
@@ -298,27 +445,64 @@ async def cmd_evaluate(args: argparse.Namespace) -> None:
                 f"[{exp['name']}] NDCG@10: {summary['ndcg@10']:.4f} | Recall@100: {summary['recall@100']:.4f} | Latency P95: {summary['latency_p95']:.2f}ms"
             )
 
+        conditions = measurement_conditions()
         os.makedirs("docs", exist_ok=True)
         report_file = f"docs/benchmark-evaluation-{split}.md"
         with open(report_file, "w", encoding="utf-8") as f:
             f.write(
                 f"# NEXUS Benchmark Evaluation — {dataset_name.upper()} ({split.upper()} split)\n\n"
             )
+            f.write(f"- **Split**: {SPLIT_DESCRIPTIONS[split]}\n")
             f.write(f"- **Corpus**: {expected_corpus} documents\n")
             f.write(f"- **Queries**: {len(queries)} queries\n")
-            f.write(f"- **Project ID**: `{project_id}`\n\n")
             f.write(
-                "| Configuration | NDCG@10 | Recall@100 | Avg Candidates | Latency Avg | Latency P95 |\n"
+                f"- **Measured**: {conditions['timestamp_utc']} at commit `{conditions['git_commit']}`\n"
             )
-            f.write("|---|---|---|---|---|---|\n")
+            f.write(
+                f"- **Hardware**: {conditions['cpu']}, {conditions['logical_cpus']} logical CPUs, CPU-only\n"
+            )
+            f.write(
+                f"- **Models**: dense `{conditions['models']['dense']}`, reranker "
+                f"`{conditions['models']['reranker']}`\n"
+            )
+            f.write(
+                "- **Latency**: wall-clock per query from the benchmark client (query "
+                "embedding + SQL + fusion), after one unmeasured warm-up query.\n\n"
+            )
+            f.write(
+                "| Configuration | NDCG@10 | Recall@10 | Recall@100 | MRR | Latency Avg | Latency P95 |\n"
+            )
+            f.write("|---|---:|---:|---:|---:|---:|---:|\n")
 
             for exp in experiments:
                 s = results_map[exp["name"]]
+                recall_100 = f"{s['recall@100']:.4f}" if exp["top_k"] >= 100 else "n/a"
                 f.write(
-                    f"| {exp['name']} | {s['ndcg@10']:.4f} | {s['recall@100']:.4f} | {s['avg_returned_candidates']:.1f} | {s['latency_avg']:.2f}ms | {s['latency_p95']:.2f}ms |\n"
+                    f"| {exp['name']} | {s['ndcg@10']:.4f} | {s['recall@10']:.4f} | {recall_100} | {s['mrr']:.4f} | {s['latency_avg']:.2f} ms | {s['latency_p95']:.2f} ms |\n"
                 )
 
-        print(f"\nEvaluation complete. Full report written to {report_file}.")
+        results_file = f"docs/benchmark-evaluation-{split}.json"
+        with open(results_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "dataset": dataset_name,
+                    "split": split,
+                    "split_description": SPLIT_DESCRIPTIONS[split],
+                    "queries": len(queries),
+                    "corpus_documents": expected_corpus,
+                    "conditions": conditions,
+                    "configurations": [
+                        {**exp, "metrics": results_map[exp["name"]]}
+                        for exp in experiments
+                    ],
+                },
+                f,
+                indent=2,
+            )
+
+        print(
+            f"\nEvaluation complete. Report written to {report_file} and {results_file}."
+        )
 
 
 def cmd_verify(args: argparse.Namespace) -> None:
@@ -424,7 +608,15 @@ def main():
         "--split",
         required=True,
         choices=["test", "train"],
-        help="Explicit split to evaluate: 'test' (canonical 300 queries) or 'train' (809 queries)",
+        help=(
+            "'test' = BEIR test qrels (300 queries; these are the official SciFact dev "
+            "claims) or 'train' (809 queries)"
+        ),
+    )
+    p_eval.add_argument(
+        "--with-rerank",
+        action="store_true",
+        help="Also evaluate CPU cross-encoder reranking of the top 25 (slow, downloads ~90 MB model)",
     )
 
     p_gen = subparsers.add_parser("generate-llm-variants")

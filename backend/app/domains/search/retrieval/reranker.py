@@ -1,9 +1,10 @@
 import logging
-
-import torch
-from sentence_transformers import CrossEncoder
+from typing import TYPE_CHECKING
 
 from app.domains.search.retrieval.models import Candidate
+
+if TYPE_CHECKING:
+    from sentence_transformers import CrossEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -22,17 +23,22 @@ class LocalCrossEncoderReranker(RerankerProvider):
         max_length: int = 512,
     ):
         self.model_name = model_name
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        # We load the model lazily to avoid heavy imports slowing down startup if reranking isn't used.
-        self.model = None
+        # torch and the model are loaded lazily so that processes which never rerank
+        # (the stable search modes) do not pay their import time or memory.
+        self.model: CrossEncoder | None = None
         self.max_length = max_length
 
-    def _load_model(self) -> None:
+    def _load_model(self) -> "CrossEncoder":
         if self.model is None:
-            logger.info(f"Loading CrossEncoder: {self.model_name} on {self.device}")
+            import torch
+            from sentence_transformers import CrossEncoder
+
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            logger.info(f"Loading CrossEncoder: {self.model_name} on {device}")
             self.model = CrossEncoder(
-                self.model_name, max_length=self.max_length, device=self.device
+                self.model_name, max_length=self.max_length, device=device
             )
+        return self.model
 
     def rerank(
         self, query: str, candidates: list[Candidate], top_k: int = 10
@@ -40,8 +46,7 @@ class LocalCrossEncoderReranker(RerankerProvider):
         if not candidates:
             return []
 
-        self._load_model()
-        assert self.model is not None
+        model = self._load_model()
 
         pairs = []
         for c in candidates:
@@ -50,7 +55,7 @@ class LocalCrossEncoderReranker(RerankerProvider):
                 passage = c.snippet if c.snippet else ""
             pairs.append((query, passage))
 
-        scores = self.model.predict(pairs, show_progress_bar=False)
+        scores = model.predict(pairs, show_progress_bar=False)
 
         for i, c in enumerate(candidates):
             c.reranker_score = float(scores[i])

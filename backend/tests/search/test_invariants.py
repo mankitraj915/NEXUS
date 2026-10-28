@@ -197,6 +197,11 @@ def test_api_search_mode_validation():
     assert SearchMode.is_valid_mode("adaptive") is True
     assert SearchMode.normalize_mode("experimental_adaptive") == "adaptive"
 
+    # Reranking is reachable only as an explicit experimental mode (ADR-005)
+    assert SearchMode.normalize_mode("experimental_hybrid_rerank") == "hybrid_rerank"
+    assert SearchMode.normalize_mode("hybrid_rerank") == "hybrid_rerank"
+    assert SearchMode.normalize_mode("hybrid_no_rerank") == "hybrid_fixed"
+
     # Invalid modes
     assert SearchMode.is_valid_mode("invalid_mode_xyz") is False
     assert SearchMode.is_valid_mode("") is False

@@ -17,6 +17,7 @@ class SearchMode(str, Enum):
     EXPERIMENTAL_LEARNED = "experimental_learned"
     EXPERIMENTAL_MULTI_QUERY_RULE = "experimental_multi_query_rule"
     EXPERIMENTAL_MULTI_QUERY_LLM = "experimental_multi_query_llm"
+    EXPERIMENTAL_HYBRID_RERANK = "experimental_hybrid_rerank"
 
     @classmethod
     def is_valid_mode(cls, mode: str) -> bool:
@@ -38,8 +39,10 @@ class SearchMode(str, Enum):
     @classmethod
     def normalize_mode(cls, mode: str) -> str:
         """Map external mode strings to internal orchestrator execution modes."""
-        if mode in ("hybrid", "hybrid_fixed", "hybrid_no_rerank", "hybrid_rerank"):
+        if mode in ("hybrid", "hybrid_fixed", "hybrid_no_rerank"):
             return "hybrid_fixed"
+        if mode in ("experimental_hybrid_rerank", "hybrid_rerank"):
+            return "hybrid_rerank"
         if mode in ("experimental_adaptive", "adaptive"):
             return "adaptive"
         if mode in ("experimental_learned", "learned"):

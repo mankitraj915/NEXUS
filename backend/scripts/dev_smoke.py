@@ -225,11 +225,29 @@ async def run_pipeline_and_search(persist_seed: bool) -> uuid.UUID:
     return project_id
 
 
-async def check_api_server(project_id: uuid.UUID, is_seeded: bool) -> None:
-    print("[5/5] Checking live FastAPI HTTP server (http://127.0.0.1:8000)...")
+async def check_api_server(
+    project_id: uuid.UUID, is_seeded: bool, api_url: str
+) -> None:
+    print(f"[5/5] Checking live FastAPI HTTP server ({api_url})...")
     try:
         async with httpx.AsyncClient(timeout=1.5) as client:
-            resp_health = await client.get("http://127.0.0.1:8000/health")
+            # Confirm the port is actually serving NEXUS, not another local service
+            resp_schema = await client.get(
+                f"{api_url}{settings.API_V1_STR}/openapi.json"
+            )
+            title = (
+                resp_schema.json().get("info", {}).get("title")
+                if resp_schema.status_code == 200
+                else None
+            )
+            if title != settings.PROJECT_NAME:
+                print(
+                    f"      [WARN] {api_url} is not serving the NEXUS API "
+                    f"(OpenAPI title: {title!r}). Start NEXUS on a free port and pass --api-url."
+                )
+                return
+
+            resp_health = await client.get(f"{api_url}/health")
             if resp_health.status_code == 200:
                 print(f"      [PASS] GET /health -> 200 OK {resp_health.json()}")
             else:
@@ -237,30 +255,35 @@ async def check_api_server(project_id: uuid.UUID, is_seeded: bool) -> None:
                     f"      [WARN] GET /health returned status {resp_health.status_code}"
                 )
 
-            resp_docs = await client.get("http://127.0.0.1:8000/docs")
+            resp_docs = await client.get(f"{api_url}/docs")
             if resp_docs.status_code == 200:
                 print("      [PASS] GET /docs -> 200 OK (Swagger UI available)")
 
             if is_seeded:
                 resp_search = await client.get(
-                    "http://127.0.0.1:8000/api/v1/search",
+                    f"{api_url}{settings.API_V1_STR}/search",
                     params={
                         "project_id": str(project_id),
                         "q": "hybrid search",
                         "mode": "hybrid_fixed",
                     },
                 )
-                if resp_search.status_code == 200:
-                    hits = resp_search.json().get("results", [])
-                    print(
-                        f"      [PASS] GET /api/v1/search -> 200 OK ({len(hits)} results returned)"
+                if resp_search.status_code != 200:
+                    raise RuntimeError(
+                        f"GET /api/v1/search returned {resp_search.status_code}: {resp_search.text}"
                     )
+                hits = resp_search.json().get("results", [])
+                print(
+                    f"      [PASS] GET /api/v1/search -> 200 OK ({len(hits)} results returned)"
+                )
     except (httpx.ConnectError, httpx.ConnectTimeout):
-        print(
-            "      [INFO] FastAPI server is not currently running on port 8000 (offline check passed)."
-        )
+        print(f"      [INFO] No server is running at {api_url} (API check skipped).")
         print(
             "             Start the server with: uv run uvicorn app.main:app --port 8000"
+        )
+    except ValueError:
+        print(
+            f"      [WARN] {api_url} returned a non-JSON response; it is not the NEXUS API."
         )
 
 
@@ -271,7 +294,13 @@ async def main() -> None:
         action="store_true",
         help="Keep sample data in database as a persistent demo project for API testing",
     )
+    parser.add_argument(
+        "--api-url",
+        default="http://127.0.0.1:8000",
+        help="Base URL of a running NEXUS API to check (default: http://127.0.0.1:8000)",
+    )
     args = parser.parse_args()
+    api_url = args.api_url.rstrip("/")
 
     print("=" * 65)
     print("NEXUS Runtime & Local Environment Smoke Verification")
@@ -284,17 +313,17 @@ async def main() -> None:
         await check_database()
         await check_schema()
         project_id = await run_pipeline_and_search(persist_seed=args.seed)
-        await check_api_server(project_id, is_seeded=args.seed)
+        await check_api_server(project_id, is_seeded=args.seed, api_url=api_url)
 
         print("-" * 65)
-        print("STATUS: ALL SMOKE CHECKS PASSED (100% HEALTHY)")
+        print("STATUS: ALL SMOKE CHECKS PASSED")
         if args.seed:
+            search_url = f"{api_url}{settings.API_V1_STR}/search?project_id={project_id}&q=hybrid+search"
             print("\nPersistent Demo Project Seeded!")
             print(f"Project ID: {project_id}")
-            print("\nYou can now test search via PowerShell:")
-            print(
-                f'Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/search?project_id={project_id}&q=hybrid+search&mode=hybrid_fixed"'
-            )
+            print("\nSearch it once the API is running:")
+            print(f'  curl "{search_url}"')
+            print(f'  Invoke-RestMethod -Uri "{search_url}"')
         print("=" * 65)
     except Exception as exc:
         import traceback

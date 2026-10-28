@@ -33,7 +33,7 @@ async def search(
         25,
         ge=1,
         le=100,
-        description="Unused by stable modes; cross-encoder reranking was rejected (ADR-005)",
+        description="Candidates reranked in experimental_hybrid_rerank mode (rejected for production, ADR-005); ignored by stable modes",
     ),
     rrf_k: int = Query(
         10,

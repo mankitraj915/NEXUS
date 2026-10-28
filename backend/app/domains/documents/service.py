@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.documents.models import Document, DocumentVersion
-from app.domains.search.indexer import index_document_version
+from app.domains.search.indexer import deindex_document_version, index_document_version
 
 
 def compute_hash(text: str) -> str:
@@ -61,6 +61,8 @@ async def save_document(
     await db.commit()
     await db.refresh(version)
 
+    if latest_version:
+        await deindex_document_version(db, latest_version.id)
     await index_document_version(db, version.id)
 
     from app.domains.embeddings.pipeline import process_document_version

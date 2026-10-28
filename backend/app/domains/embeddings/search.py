@@ -27,7 +27,7 @@ async def dense_search(
         .join(DocumentVersion, Chunk.document_version_id == DocumentVersion.id)
         .join(Document, DocumentVersion.document_id == Document.id)
         .where(Document.project_id == project_id)
-        .order_by(distance_expr)
+        .order_by(distance_expr, Chunk.id)
         .limit(top_k * 5)
     )
 

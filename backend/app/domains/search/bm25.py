@@ -99,7 +99,9 @@ async def search_project(
         if score > 0:
             scores.append((score, doc_vid))
 
-    top_results = heapq.nlargest(top_k, scores, key=lambda x: x[0])
+    # Ties are broken by version id so rankings do not depend on SQL row order.
+    top_results = heapq.nlargest(top_k, scores, key=lambda x: (x[0], str(x[1])))
+    rank_of = {vid: i for i, (_, vid) in enumerate(top_results)}
 
     if not top_results:
         return []
@@ -116,7 +118,7 @@ async def search_project(
     enrich_results = (await db.execute(stmt_enrich)).all()
 
     final_results = []
-    for ver, doc in enrich_results:
+    for ver, doc in sorted(enrich_results, key=lambda row: rank_of[row[0].id]):
         min_pos = docs[ver.id]["min_pos"]
         if min_pos == float("inf"):
             min_pos = 0
@@ -140,5 +142,4 @@ async def search_project(
             )
         )
 
-    final_results.sort(key=lambda x: x.score, reverse=True)
     return final_results

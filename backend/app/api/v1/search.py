@@ -30,11 +30,22 @@ async def search(
         100, ge=10, le=1000, description="Depth of initial retrieval for hybrid"
     ),
     rerank_k: int = Query(
-        25, ge=1, le=100, description="Number of candidates to neural rerank"
+        25,
+        ge=1,
+        le=100,
+        description="Unused by stable modes; cross-encoder reranking was rejected (ADR-005)",
     ),
-    rrf_k: int = Query(60, ge=1, le=200, description="RRF constant"),
+    rrf_k: int = Query(
+        10,
+        ge=1,
+        le=200,
+        description="RRF constant (k=10 is the benchmarked production baseline)",
+    ),
     db: AsyncSession = Depends(get_db),
 ):
+    if not q.strip():
+        raise HTTPException(status_code=422, detail="Query must not be blank")
+
     project = await get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -63,16 +74,16 @@ async def search(
         rrf_k=rrf_k,
     )
 
-    # Map candidates back to SearchResultItem for the API
+    # Surface the score that produced the ranking (higher is better) and the 1-based rank
     results = []
-    for c in candidates:
-        # Determine best score to surface in the basic API
-        score = (
-            c.final_rank
-            if c.final_rank
-            else c.rrf_score
-            if c.rrf_score
-            else c.bm25_score or c.dense_score or 0.0
+    for rank, c in enumerate(candidates, start=1):
+        score = next(
+            (
+                s
+                for s in (c.reranker_score, c.rrf_score, c.bm25_score, c.dense_score)
+                if s is not None
+            ),
+            0.0,
         )
 
         results.append(
@@ -81,6 +92,7 @@ async def search(
                 url=c.url or "",
                 title=c.title or "Untitled",
                 score=score,
+                rank=rank,
                 snippet=c.snippet or "",
             )
         )

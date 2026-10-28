@@ -2,15 +2,61 @@ import logging
 import uuid
 from collections import defaultdict
 
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.documents.models import Document, DocumentVersion
+from app.domains.embeddings.models import Chunk
 from app.domains.search.analyzer import analyze_text
 from app.domains.search.models import DocumentStats, Posting, ProjectStats, Term
 
 logger = logging.getLogger(__name__)
+
+
+async def deindex_document_version(db: AsyncSession, version_id: uuid.UUID) -> None:
+    """
+    Removes a superseded version from the lexical and dense indexes so that only the
+    latest version of a document is searchable and corpus statistics stay consistent.
+    The DocumentVersion row itself is kept as history.
+    """
+    doc_stats = (
+        (
+            await db.execute(
+                select(DocumentStats).where(
+                    DocumentStats.document_version_id == version_id
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+    if doc_stats and doc_stats.status == "INDEXED":
+        await db.execute(
+            update(ProjectStats)
+            .where(ProjectStats.project_id == doc_stats.project_id)
+            .values(
+                total_documents=ProjectStats.total_documents - 1,
+                total_tokens=ProjectStats.total_tokens - doc_stats.token_count,
+            )
+        )
+        term_ids = select(Posting.term_id).where(
+            Posting.document_version_id == version_id
+        )
+        await db.execute(
+            update(Term)
+            .where(Term.id.in_(term_ids))
+            .values(document_frequency=Term.document_frequency - 1)
+        )
+
+    await db.execute(delete(Posting).where(Posting.document_version_id == version_id))
+    await db.execute(
+        delete(DocumentStats).where(DocumentStats.document_version_id == version_id)
+    )
+    # Chunk embeddings are removed by the ON DELETE CASCADE foreign key.
+    await db.execute(delete(Chunk).where(Chunk.document_version_id == version_id))
+    await db.commit()
 
 
 async def index_document_version(db: AsyncSession, version_id: uuid.UUID) -> None:

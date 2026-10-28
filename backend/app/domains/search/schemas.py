@@ -57,6 +57,7 @@ class SearchResultItem(BaseModel):
     title: str
     score: float
     snippet: str
+    rank: int | None = None
 
 
 class SearchResponse(BaseModel):

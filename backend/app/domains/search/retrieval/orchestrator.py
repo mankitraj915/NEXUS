@@ -27,7 +27,7 @@ async def execute_search(
     retrieval_k_bm25: int | None = None,
     retrieval_k_dense: int | None = None,
     rerank_k: int = 25,
-    rrf_k: int = 60,
+    rrf_k: int = 10,
     return_analysis: bool = False,
     multi_query_strategy: str = "strategy_a",
     llm_max_variants: int = 3,

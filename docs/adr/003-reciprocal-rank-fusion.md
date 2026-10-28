@@ -39,7 +39,7 @@ Measured on SciFact (300-query test split, depth 100/100):
 - On the evaluated SciFact test split (5,183 scientific abstracts), tuning k down to 10 yielded a +0.0145 NDCG@10 improvement over k=60. This is an empirical finding on this specific technical abstract corpus rather than a universal claim across arbitrary document domains.
 - Lower k sharpens the rank decay: rank 1 + rank 1 agreement contributes `(1/11) + (1/12) = 0.1742`, whereas rank 10 + rank 10 contributes `(1/20) + (1/20) = 0.1000`. Under k=60, the distinction between top and mediocre ranks is heavily dampened (`0.0325` vs `0.0286`).
 - Hybrid RRF (k=10) improves NDCG@10 by +6.7% over BM25-only and +8.2% over Dense-only on this workload. Recall@100 reaches 0.9577.
-- The cost is executing both branches one after the other (they share one database session): on the untuned 809-query split, P95 latency is 366 ms for hybrid vs 188 ms for BM25 and 210 ms for dense.
+- The cost is executing both branches one after the other (they share one database session): on the untuned 809-query split, P95 latency is 295 ms for hybrid vs 121 ms for BM25 and 190 ms for dense.
 
 ## Trade-offs
 - **Pro**: Rank-based fusion eliminates cross-retriever score calibration (cosine similarity vs unbounded BM25).
@@ -55,4 +55,4 @@ Measured on SciFact (300-query test split, depth 100/100):
 
 ## Addendum (2026-10-28): split provenance and out-of-sample check
 
-The "300-query test split" above is BEIR's SciFact test qrels, which are the official SciFact **dev** claims, and k was chosen on it, so the +0.0145 gain is an in-sample result. On the 809 BEIR train queries, which were never used for tuning, the re-measured NDCG@10 is 0.7180 for k=10 vs 0.7112 for k=60 (+0.0068), with BM25 at 0.6690 and dense at 0.6759. k=10 remains the default, but the advantage over k=60 is small, and its statistical significance has not been tested. The latency columns above came from an earlier, differently loaded run; current numbers and caveats are in [`docs/benchmarking.md`](../benchmarking.md).
+The "300-query test split" above is BEIR's SciFact test qrels, which are the official SciFact **dev** claims, and k was chosen on it, so the +0.0145 gain is an in-sample result. On the 809 BEIR train queries, which were never used for tuning, the re-measured NDCG@10 is 0.7180 for k=10 vs 0.7112 for k=60, with BM25 at 0.6690 and dense at 0.6759. A pre-specified paired randomization test on those queries gives a mean gain of +0.0069 (95% CI +0.0018 to +0.0120, p = 0.0083), which survives Holm correction alongside the gains over BM25 and dense. k=10 remains the default. Its advantage is statistically reliable on this corpus but small: NDCG@10 is unchanged for 707 of 809 queries. The latency columns above came from an earlier, differently loaded run; current numbers and caveats are in [`docs/benchmarking.md`](../benchmarking.md).

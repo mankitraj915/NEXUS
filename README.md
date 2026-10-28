@@ -15,11 +15,11 @@ The repository is also a measurement record. Retrieval quality is evaluated on B
 
 **What the results show** (5,183 SciFact abstracts; full tables [below](#benchmark-results-scifact))
 
-- On 809 queries never used for tuning, hybrid RRF reaches NDCG@10 **0.7180**, against 0.6690 for BM25 and 0.6759 for dense.
-- RRF k=10 beats the common default k=60 by only +0.0068 NDCG@10 on those queries, and that difference has not been significance-tested.
-- Cross-encoder reranking (`ms-marco-MiniLM-L-6-v2`) *lowered* NDCG@10 from 0.7188 to 0.6752 and made queries about 4.7× slower.
+- On 809 queries never used for tuning, hybrid RRF reaches NDCG@10 **0.7180**, against 0.6690 for BM25 and 0.6759 for dense. Paired randomization tests put both gains at p ≤ 0.0001.
+- RRF k=10 beats the common default k=60 on those queries by a small margin: +0.0069 NDCG@10 (95% CI +0.0018 to +0.0120, p = 0.008). NDCG@10 differs on only 102 of the 809 queries.
+- Cross-encoder reranking (`ms-marco-MiniLM-L-6-v2`) *lowered* NDCG@10 from 0.7188 to 0.6752 (p = 0.002) and made queries about 5.7× slower.
 
-**What they don't show:** behaviour on other domains or corpora much larger than about 5k documents, statistical significance, or latency under concurrent load. Latencies come from one laptop with uncontrolled background load.
+**What they don't show:** behaviour on other domains or on corpora much larger than about 5k documents, or latency under concurrent load. Latencies come from one laptop with uncontrolled background load.
 
 ---
 
@@ -98,31 +98,44 @@ Official SciFact test labels are not public and are not used.
 
 | Retriever / Fusion | Configuration | NDCG@10 | Recall@10 | Recall@100 | MRR | Latency Avg | Latency P95 |
 |---|---|---:|---:|---:|---:|---:|---:|
-| Lexical only | Custom BM25 (`k1=1.5, b=0.75`) | 0.6690 | 0.7886 | 0.9149 | 0.6413 | 85 ms | 188 ms |
-| Dense only | `all-MiniLM-L6-v2` + pgvector exact cosine | 0.6759 | 0.8042 | 0.9306 | 0.6503 | 120 ms | 210 ms |
-| Hybrid RRF | k=60 (Cormack et al. default), depth 100/100 | 0.7112 | 0.8312 | 0.9522 | 0.6835 | 204 ms | 355 ms |
-| **Hybrid RRF (default)** | **k=10, depth 100/100** | **0.7180** | **0.8422** | **0.9522** | **0.6888** | **208 ms** | **366 ms** |
+| Lexical only | Custom BM25 (`k1=1.5, b=0.75`) | 0.6690 | 0.7886 | 0.9149 | 0.6413 | 60 ms | 121 ms |
+| Dense only | `all-MiniLM-L6-v2` + pgvector exact cosine | 0.6759 | 0.8042 | 0.9306 | 0.6503 | 110 ms | 190 ms |
+| Hybrid RRF | k=60 (Cormack et al. default), depth 100/100 | 0.7112 | 0.8312 | 0.9522 | 0.6835 | 185 ms | 322 ms |
+| **Hybrid RRF (default)** | **k=10, depth 100/100** | **0.7180** | **0.8422** | **0.9522** | **0.6888** | **184 ms** | **295 ms** |
 
 **Tuning split (300 queries; k=10 selected here)**:
 
 | Retriever / Fusion | NDCG@10 | Recall@10 | Recall@100 | MRR | Latency Avg | Latency P95 |
 |---|---:|---:|---:|---:|---:|---:|
-| Lexical only (BM25) | 0.6736 | 0.8105 | 0.9064 | 0.6388 | 90 ms | 172 ms |
-| Dense only | 0.6642 | 0.8096 | 0.9277 | 0.6287 | 143 ms | 233 ms |
-| Hybrid RRF, k=60 | 0.7043 | 0.8249 | 0.9577 | 0.6783 | 230 ms | 369 ms |
-| **Hybrid RRF, k=10 (default)** | **0.7188** | **0.8568** | **0.9577** | **0.6850** | 272 ms | 557 ms |
-| k=10 + cross-encoder rerank of top 25 | 0.6752 | 0.8240 | n/a | 0.6386 | 1,273 ms | 1,871 ms |
+| Lexical only (BM25) | 0.6736 | 0.8105 | 0.9064 | 0.6388 | 55 ms | 109 ms |
+| Dense only | 0.6642 | 0.8096 | 0.9277 | 0.6287 | 113 ms | 221 ms |
+| Hybrid RRF, k=60 | 0.7043 | 0.8249 | 0.9577 | 0.6783 | 186 ms | 317 ms |
+| **Hybrid RRF, k=10 (default)** | **0.7188** | **0.8568** | **0.9577** | **0.6850** | 181 ms | 284 ms |
+| k=10 + cross-encoder rerank of top 25 | 0.6752 | 0.8240 | n/a | 0.6386 | 1,028 ms | 1,394 ms |
 
 The generated reports record model revisions, library versions and hardware: [`backend/docs/benchmark-evaluation-train.md`](backend/docs/benchmark-evaluation-train.md) and [`backend/docs/benchmark-evaluation-test.md`](backend/docs/benchmark-evaluation-test.md), each with a `.json` sidecar.
 
-- **Reproducibility.** On a freshly rebuilt index, the tuning-split quality metrics for BM25, dense and hybrid reproduced the previously published values exactly. Reranking came out at 0.6752 vs 0.6751.
+- **Reproducibility.** Both splits were re-run for this release to record per-query scores. Every quality metric matched the previous run to four decimals, and the reranking result also matches the original study (0.6752 vs 0.6751).
 - **Latency.** It was measured on an Intel i5-10200H laptop (8 GB RAM, CPU only) **while other workloads competed for memory**, so treat it as indicative. The k=10 and k=60 hybrid rows do identical work, so their latency differences are measurement noise.
+
+### Paired significance (NDCG@10, default k=10 vs each configuration)
+
+| Split | Compared with | Mean Δ | 95% CI | p | Default wins / ties / losses |
+|---|---|---:|---:|---:|---:|
+| Untuned (809) | BM25 | +0.0491 | [+0.0357, +0.0626] | ≤ 0.0001 | 182 / 556 / 71 |
+| Untuned (809) | Dense | +0.0421 | [+0.0278, +0.0565] | ≤ 0.0001 | 190 / 516 / 103 |
+| Untuned (809) | Hybrid k=60 | +0.0069 | [+0.0018, +0.0120] | 0.0083 | 61 / 707 / 41 |
+| Tuning (300) | k=10 + rerank | +0.0436 | [+0.0159, +0.0708] | 0.0022 | 74 / 178 / 48 |
+
+- **Method.** The tests are a paired randomization test and a percentile-bootstrap CI over per-query differences, each with 10,000 fixed-seed resamples. p ≤ 0.0001 is the smallest value that many resamples can report.
+- **Pre-specified family.** The three untuned-split rows were named as the primary comparisons before the run. All three remain significant under Holm–Bonferroni at α = 0.05.
+- **Tuning-split rows.** The generated test report also compares the default with BM25, dense and k=60 on the 300-query split. Those rows are not used as evidence, because k=10 was selected there.
 
 ### Findings
 
 1. **Fusion helps, out of sample too.** On the untuned split, hybrid RRF (k=10) improves NDCG@10 by +0.049 (+7.3%) over BM25 and +0.042 (+6.2%) over dense, and lifts Recall@100 to 0.952. Neither single retriever dominates: BM25 wins on the tuning split, dense on the untuned one.
-2. **k=10 beats k=60, but by less than the tuning split suggested.** The gain is +0.0145 NDCG@10 on the split where k was chosen and +0.0068 on the untuned split. Per-query significance has not been tested, so treat k=10 as a small, corpus-specific improvement rather than a general rule.
-3. **Latency cost.** Hybrid runs both retrievers one after the other, because they share a database session. That roughly doubles average latency relative to either single retriever on this machine: 85–120 ms rises to about 208 ms on the untuned split.
+2. **k=10 beats k=60, but by less than the tuning split suggested.** The gain is +0.0145 NDCG@10 on the split where k was chosen and +0.0069 on the untuned split. It is statistically reliable there (p = 0.008), but small: k changes the score on only 102 of 809 queries. Treat it as a corpus-specific setting, not a general rule.
+3. **Latency cost.** Hybrid runs both retrievers one after the other, because they share a database session, so its average latency is close to the sum of the two: 184 ms vs 60 ms for BM25 and 110 ms for dense on the untuned split.
 
 ---
 
@@ -136,7 +149,7 @@ The generated reports record model revisions, library versions and hardware: [`b
 
 ### 2. Cross-encoder reranking: rejected ([ADR-005](docs/adr/005-cross-encoder-rejection.md))
 - **Hypothesis**: Reranking fused candidates with `cross-encoder/ms-marco-MiniLM-L-6-v2` improves ranking.
-- **Outcome**: Re-measured in this release at depth 25 on the tuning split, NDCG@10 was **0.6752** vs 0.7188 without reranking, at ~4.7× the average latency. The original study found NDCG@10 falling at depths 10, 25 and 50 alike.
+- **Outcome**: Re-measured in this release at depth 25 on the tuning split, NDCG@10 was **0.6752** vs 0.7188 without reranking (paired randomization p = 0.002), at ~5.7× the average latency. The original study found NDCG@10 falling at depths 10, 25 and 50 alike.
 - **Decision**: Rejected for the default path; available as `experimental_hybrid_rerank`.
 
 ### 3. LLM query expansion: inconclusive
@@ -206,7 +219,7 @@ uv run pytest tests/                         # integration tests skip without Po
 
 ### Integration tests (Postgres running; CI's `integration` job)
 
-With Postgres up, `uv run pytest tests/` runs all 60 tests.
+With Postgres up, `uv run pytest tests/` runs all 66 tests.
 
 - **Isolation.** Integration tests use a separate database, `<POSTGRES_DB>_test`, which is created automatically and truncated between tests. The development database and its benchmark index are never touched.
 - **Coverage.** Tenant isolation, version replacement, idempotent re-ingestion, empty and no-match queries, ranking order and uniqueness per mode, hybrid fusion on a fresh session, failure propagation, API validation and the crawler pipeline.
@@ -267,5 +280,4 @@ NEXUS/
 ## Next steps
 
 1. **HNSW indexing**: measure build time, latency and recall for pgvector HNSW (`m`, `ef_construction`, `ef_search`).
-2. **Significance testing**: store per-query metrics and add paired tests for configuration comparisons such as k=10 vs k=60.
-3. **Sentence-aware chunking**: test whether sentence-boundary chunks improve dense retrieval on SciFact.
+2. **Sentence-aware chunking**: test whether sentence-boundary chunks improve dense retrieval on SciFact.

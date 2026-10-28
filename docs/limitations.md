@@ -4,7 +4,7 @@ This document explicitly describes what NEXUS does not do and where the system's
 
 ## Dense retrieval uses exact scan
 
-pgvector queries use exact cosine distance computation (`ORDER BY embedding <=> query_embedding`). There is no HNSW or IVFFlat index. This means dense retrieval latency scales linearly with corpus size. On the 5,183-document SciFact corpus this is acceptable (dense-only P95 of 210–233 ms measured in this release), but would become a bottleneck at tens of thousands of documents.
+pgvector queries use exact cosine distance computation (`ORDER BY embedding <=> query_embedding`). There is no HNSW or IVFFlat index. This means dense retrieval latency scales linearly with corpus size. On the 5,183-document SciFact corpus this is acceptable (dense-only P95 of 190–221 ms measured in this release), but would become a bottleneck at tens of thousands of documents.
 
 Adding an HNSW index is a straightforward pgvector operation, but it has not been implemented or measured, so it is not claimed.
 

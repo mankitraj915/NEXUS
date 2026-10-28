@@ -65,7 +65,7 @@ NEXUS is a hybrid search engine with three major subsystems: **ingestion**, **re
 | BM25 Scorer | `search/bm25.py` | Full BM25 scoring with positional snippet extraction |
 | Dense Search | `embeddings/search.py` | pgvector cosine distance, best-chunk-per-document deduplication |
 | RRF Fusion | `retrieval/fusion.py` | Standard RRF and multi-query RRF (Strategy A / B) |
-| Orchestrator | `retrieval/orchestrator.py` | Parallel dispatch, mode routing, fallback handling |
+| Orchestrator | `retrieval/orchestrator.py` | Mode routing, sequential BM25 → dense retrieval, fusion |
 | Reranker | `retrieval/reranker.py` | Cross-encoder reranking (lazy-loaded, experimentally rejected) |
 | Learned Router | `retrieval/learned_router.py` | Decision tree routing (experimentally rejected) |
 | Query Features | `query/features.py` | 8 query features: token count, rarity, NL score, identifier density, etc. |
@@ -161,9 +161,9 @@ erDiagram
 2. SearchMode.normalize_mode() maps mode string to internal mode
 3. Orchestrator dispatches based on mode:
    
-   hybrid_fixed:
-     ├── asyncio.create_task(retrieve_lexical)  →  BM25 candidates
-     └── asyncio.create_task(retrieve_dense)    →  Dense candidates
+   hybrid_fixed (branches run sequentially; they share one AsyncSession):
+     ├── await retrieve_lexical(...)  →  BM25 candidates
+     └── await retrieve_dense(...)    →  Dense candidates
      
 4. BM25 path:
    query → analyze_text() → term lookup → posting retrieval → BM25 score → rank
@@ -182,12 +182,9 @@ erDiagram
 
 ### Failure handling
 
-The orchestrator implements explicit fallback:
-- If BM25 fails in hybrid mode: continues with dense results only
-- If Dense fails in hybrid mode: continues with BM25 results only
-- If RRF fusion fails: returns the available candidate list directly
-- If adaptive/learned planning fails: falls back to `hybrid_fixed`
-- If reranker fails: returns un-reranked fusion results
+In the stable modes (`lexical`, `dense`, `hybrid_fixed`) and in `experimental_hybrid_rerank`, a retriever or reranker error propagates (HTTP 500 from the API). A hybrid response therefore always comes from both branches. An earlier version caught branch failures and silently returned the other branch's ranking. Combined with running both branches as concurrent tasks on one session, that made hybrid search on a session without an open connection return BM25-only results without any error. The API and the benchmark harness always ran a query on the session first, so the published results were not affected. Running the branches sequentially changed no ranking and no measurable latency: an interleaved comparison on the 300 tuning-split queries produced identical rankings and a median difference of −3.8 ms.
+
+The experimental modes still degrade: failed adaptive or learned planning falls back to `hybrid_fixed`, and a failed retrieval for one multi-query variant is logged and skipped.
 
 ## Isolation model
 

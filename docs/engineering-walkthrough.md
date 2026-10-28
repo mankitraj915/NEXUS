@@ -17,7 +17,7 @@ The initial system established:
 - **Document storage**: Content-hash deduplication, version tracking, metadata extraction
 - **Custom BM25 implementation**: Text analyzer (NFKC normalization, Snowball stemming, 174 stopwords), inverted index with positional posting lists, BM25 scoring (k1=1.5, b=0.75)
 - **Dense retrieval**: `all-MiniLM-L6-v2` sentence-transformer, 500-char chunking with 100-char overlap, pgvector cosine distance
-- **Hybrid retrieval**: Reciprocal Rank Fusion, search orchestrator with parallel dispatch
+- **Hybrid retrieval**: Reciprocal Rank Fusion and a search orchestrator that dispatches by mode
 - **Benchmark harness**: SciFact dataset loader, evaluation metrics (NDCG, Recall, Precision, MRR), experiment tracking
 
 At this point, the system was functional but had a critical isolation gap: documents were globally unique by URL rather than scoped per project.

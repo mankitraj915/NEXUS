@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import uuid
 
@@ -98,29 +97,20 @@ async def execute_search(
         transformer = RuleBasedQueryTransformer()
         variants = await transformer.transform(query)
 
-        tasks = []
         variant_results: dict[str, dict[str, list[Candidate]]] = {}
         for v in variants:
-            variant_results[v.variant_id] = {"bm25": [], "dense": []}
-            t_bm25 = asyncio.create_task(
-                retrieve_lexical(
+            v_id = v.variant_id
+            variant_results[v_id] = {"bm25": [], "dense": []}
+            try:
+                variant_results[v_id]["bm25"] = await retrieve_lexical(
                     db, project_id, v.query, top_k=retrieval_k_bm25 or top_k
                 )
-            )
-            t_dense = asyncio.create_task(
-                retrieve_dense(
-                    db, project_id, v.query, top_k=retrieval_k_dense or top_k
-                )
-            )
-            tasks.append((v.variant_id, t_bm25, t_dense))
-
-        for v_id, t_bm25, t_dense in tasks:
-            try:
-                variant_results[v_id]["bm25"] = await t_bm25
             except Exception as e:
                 logger.error(f"BM25 failed for {v_id}: {e}")
             try:
-                variant_results[v_id]["dense"] = await t_dense
+                variant_results[v_id]["dense"] = await retrieve_dense(
+                    db, project_id, v.query, top_k=retrieval_k_dense or top_k
+                )
             except Exception as e:
                 logger.error(f"Dense failed for {v_id}: {e}")
 
@@ -162,32 +152,22 @@ async def execute_search(
 
         variants = await llm_transformer.transform(query)
 
-        # Parallel Retrieval
-        tasks = []
         llm_variant_results: dict[str, dict[str, list[Candidate]]] = {}
         weights = {}
         for v in variants:
-            weights[v.variant_id] = 1.0 if v.is_original else llm_variant_weight
-            llm_variant_results[v.variant_id] = {"bm25": [], "dense": []}
-            t_bm25 = asyncio.create_task(
-                retrieve_lexical(
+            v_id = v.variant_id
+            weights[v_id] = 1.0 if v.is_original else llm_variant_weight
+            llm_variant_results[v_id] = {"bm25": [], "dense": []}
+            try:
+                llm_variant_results[v_id]["bm25"] = await retrieve_lexical(
                     db, project_id, v.query, top_k=retrieval_k_bm25 or top_k
                 )
-            )
-            t_dense = asyncio.create_task(
-                retrieve_dense(
-                    db, project_id, v.query, top_k=retrieval_k_dense or top_k
-                )
-            )
-            tasks.append((v.variant_id, t_bm25, t_dense))
-
-        for v_id, t_bm25, t_dense in tasks:
-            try:
-                llm_variant_results[v_id]["bm25"] = await t_bm25
             except Exception as e:
                 logger.error(f"BM25 failed for {v_id}: {e}")
             try:
-                llm_variant_results[v_id]["dense"] = await t_dense
+                llm_variant_results[v_id]["dense"] = await retrieve_dense(
+                    db, project_id, v.query, top_k=retrieval_k_dense or top_k
+                )
             except Exception as e:
                 logger.error(f"Dense failed for {v_id}: {e}")
 
@@ -210,9 +190,9 @@ async def execute_search(
         )
         return (res, analysis) if return_analysis else res
 
-    bm25_task = None
-    dense_task = None
-
+    # Branches run one after the other: they share one AsyncSession, which does not
+    # support concurrent operations. Failures propagate so that a broken branch is never
+    # reported as a hybrid ranking.
     if mode in [
         "lexical",
         "hybrid_fixed",
@@ -236,9 +216,7 @@ async def execute_search(
             )
             else top_k
         )
-        bm25_task = asyncio.create_task(
-            retrieve_lexical(db, project_id, query, top_k=k_bm25)
-        )
+        bm25_candidates = await retrieve_lexical(db, project_id, query, top_k=k_bm25)
 
     if mode in [
         "dense",
@@ -263,53 +241,23 @@ async def execute_search(
             )
             else top_k
         )
-        dense_task = asyncio.create_task(
-            retrieve_dense(db, project_id, query, top_k=k_dense)
-        )
-
-    if bm25_task:
-        try:
-            bm25_candidates = await bm25_task
-        except Exception as e:
-            logger.error(f"BM25 retrieval failed: {e}")
-            if mode == "lexical":
-                return ([], analysis) if return_analysis else []
-
-    if dense_task:
-        try:
-            dense_candidates = await dense_task
-        except Exception as e:
-            logger.error(f"Dense retrieval failed: {e}")
-            if mode == "dense":
-                return ([], analysis) if return_analysis else []
+        dense_candidates = await retrieve_dense(db, project_id, query, top_k=k_dense)
 
     if mode == "lexical":
         return (bm25_candidates, analysis) if return_analysis else bm25_candidates
     elif mode == "dense":
         return (dense_candidates, analysis) if return_analysis else dense_candidates
 
-    fused_candidates = []
-    try:
-        fused_candidates = reciprocal_rank_fusion(
-            bm25_candidates, dense_candidates, k=rrf_k
-        )
-    except Exception as e:
-        logger.error(f"RRF fusion failed: {e}")
-        res = (bm25_candidates or dense_candidates)[:top_k]
-        return (res, analysis) if return_analysis else res
+    fused_candidates = reciprocal_rank_fusion(
+        bm25_candidates, dense_candidates, k=rrf_k
+    )
 
     if mode in ["hybrid_no_rerank", "hybrid_fixed", "adaptive", "learned"]:
         res = fused_candidates[:top_k]
         return (res, analysis) if return_analysis else res
 
     if mode == "hybrid_rerank":
-        try:
-            candidates_to_rerank = fused_candidates[:rerank_k]
-            reranked = _reranker.rerank(query, candidates_to_rerank, top_k=top_k)
-            return (reranked, analysis) if return_analysis else reranked
-        except Exception as e:
-            logger.error(f"Reranker failed: {e}")
-            res = fused_candidates[:top_k]
-            return (res, analysis) if return_analysis else res
+        reranked = _reranker.rerank(query, fused_candidates[:rerank_k], top_k=top_k)
+        return (reranked, analysis) if return_analysis else reranked
 
     return ([], analysis) if return_analysis else []

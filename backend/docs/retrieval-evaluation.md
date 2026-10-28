@@ -43,7 +43,7 @@ Why did this happen?
 ## 4. Latency Breakdown
 - **BM25**: Very fast (~192ms P95).
 - **Dense**: Fast (~212ms P95).
-- **RRF Union**: Since they are executed via `asyncio.gather` concurrently, the total latency for RRF(100/100) is bounded by the slowest retriever plus a negligible fusion overhead (~313ms P95).
+- **RRF Union**: ~313ms P95. *(Correction, 2026-10-29: this originally said the branches ran concurrently via `asyncio.gather`. They were scheduled as tasks on one shared database session, whose driver serializes queries, so at most the query embedding overlapped with BM25's SQL. They now run sequentially; an interleaved comparison on the 300 queries gave identical rankings and a median latency difference of −3.8 ms.)*
 - **Cross-Encoder Reranking**: Intolerably slow without GPU acceleration. Reranking 50 candidates adds nearly 3,000ms of latency, making it unsuitable for real-time user queries unless specialized hardware or smaller rerank depths are employed.
 
 ## 5. Recommended Configuration

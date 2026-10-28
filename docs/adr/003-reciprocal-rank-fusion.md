@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-NEXUS performs parallel lexical (BM25) and dense (pgvector) retrieval. These produce two independently ranked lists that must be combined into a single ranking.
+NEXUS performs lexical (BM25) and dense (pgvector) retrieval for each hybrid query. These produce two independently ranked lists that must be combined into a single ranking.
 
 ## Problem
 BM25 and dense retrieval have complementary strengths. BM25 excels on exact terminology and identifiers. Dense retrieval handles paraphrased queries and semantic similarity. Neither alone achieves the best ranking quality. A fusion strategy is needed.
@@ -39,7 +39,7 @@ Measured on SciFact (300-query test split, depth 100/100):
 - On the evaluated SciFact test split (5,183 scientific abstracts), tuning k down to 10 yielded a +0.0145 NDCG@10 improvement over k=60. This is an empirical finding on this specific technical abstract corpus rather than a universal claim across arbitrary document domains.
 - Lower k sharpens the rank decay: rank 1 + rank 1 agreement contributes `(1/11) + (1/12) = 0.1742`, whereas rank 10 + rank 10 contributes `(1/20) + (1/20) = 0.1000`. Under k=60, the distinction between top and mediocre ranks is heavily dampened (`0.0325` vs `0.0286`).
 - Hybrid RRF (k=10) improves NDCG@10 by +6.7% over BM25-only and +8.2% over Dense-only on this workload. Recall@100 reaches 0.9577.
-- The cost is executing both branches in parallel, adding ~100ms P95 latency over single-retriever modes.
+- The cost is executing both branches one after the other (they share one database session): on the untuned 809-query split, P95 latency is 366 ms for hybrid vs 188 ms for BM25 and 210 ms for dense.
 
 ## Trade-offs
 - **Pro**: Rank-based fusion eliminates cross-retriever score calibration (cosine similarity vs unbounded BM25).

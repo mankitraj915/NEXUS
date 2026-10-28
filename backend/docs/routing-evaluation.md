@@ -166,7 +166,7 @@ Based on the full 300-query validation across 5 folds, we must conclude **Outcom
 ### Key Findings:
 1. **Material Quality Loss:** The Decision Tree achieves a ~50% latency reduction (157ms -> 80ms), but it pays a heavy price. The average NDCG@10 drops from 0.7188 to 0.6742. This -0.0446 degradation is significant in the IR domain. Over 19.7% of queries experience a quality loss greater than 0.050.
 2. **Unacceptable Worst-Case Behavior:** The P95 worst-case regret is -0.3869, and the absolute worst case is -1.000. In many cases (e.g., *"The one-child policy has been successful..."*), the router aggressively routes to `CONFIG_D (BM25=100, Dense=0)` to save latency, entirely missing the semantic matches that dense retrieval provides.
-3. **Probe Overhead is Fatal:** The BM25 probe costs on average **73.78ms**. Since the fixed baseline latency is 157.81ms (where BM25 and Dense execute concurrently), inserting a 73ms sequential probe completely destroys any latency savings we could achieve by conditionally skipping dense retrieval.
+3. **Probe Overhead is Fatal:** The BM25 probe costs on average **73.78ms**. Since the fixed baseline latency is 157.81ms (the write-up assumed BM25 and dense ran concurrently; they shared one database session whose queries were serialized — see `docs/architecture.md`), inserting a 73ms sequential probe completely destroys any latency savings we could achieve by conditionally skipping dense retrieval.
 4. **Oracle Gap:** A theoretical Oracle *can* reduce latency to 86ms while keeping NDCG at 0.7490. However, our simple query features (token count, NL score) are insufficient to learn this boundary safely.
 
 ### Answer to Final Question

@@ -57,11 +57,14 @@ SAMPLE_DOCUMENTS = [
         "title": "Reciprocal Rank Fusion (RRF) Hybrid Retrieval",
         "text": (
             "Reciprocal Rank Fusion combines ranked candidate lists from lexical BM25 and dense "
-            "pgvector retrieval without requiring score calibration. An empirical parameter sweep "
-            "on the SciFact benchmark demonstrated that k=10 outperforms Cormack's heuristic k=60."
+            "pgvector retrieval without requiring score calibration. A parameter sweep on the "
+            "SciFact dev claims selected k=10 over the common default k=60."
         ),
     },
 ]
+
+# Matches documents through both BM25 and dense retrieval, so the hybrid result shows fusion.
+DEMO_QUERY = "lexical and vector hybrid search"
 
 
 async def check_database() -> None:
@@ -202,15 +205,21 @@ async def run_pipeline_and_search(persist_seed: bool) -> uuid.UUID:
         hybrid_results = await execute_search(
             db=session,
             project_id=project_id,
-            query="lexical and vector hybrid search",
+            query=DEMO_QUERY,
             mode=SearchMode.HYBRID_FIXED.value,
             top_k=3,
             rrf_k=10,
         )
         assert len(hybrid_results) > 0, "Hybrid RRF search returned 0 results"
-        print(
-            f"      [PASS] Hybrid search (RRF k=10): Top result '{hybrid_results[0].title}' (RRF={hybrid_results[0].rrf_score:.4f})"
-        )
+        assert any(
+            c.bm25_rank is not None and c.dense_rank is not None for c in hybrid_results
+        ), "Hybrid search did not fuse BM25 and dense rankings"
+        print(f"      [PASS] Hybrid search (RRF k=10), '{DEMO_QUERY}':")
+        for c in hybrid_results:
+            print(
+                f"        {c.final_rank}. {c.title}  rrf={c.rrf_score:.4f}  "
+                f"bm25_rank={c.bm25_rank}  dense_rank={c.dense_rank}"
+            )
 
         # Clean up if not seeding
         if not persist_seed:
@@ -264,7 +273,7 @@ async def check_api_server(
                     f"{api_url}{settings.API_V1_STR}/search",
                     params={
                         "project_id": str(project_id),
-                        "q": "hybrid search",
+                        "q": DEMO_QUERY,
                         "mode": "hybrid_fixed",
                     },
                 )
@@ -278,8 +287,9 @@ async def check_api_server(
                 )
     except (httpx.ConnectError, httpx.ConnectTimeout):
         print(f"      [INFO] No server is running at {api_url} (API check skipped).")
+        port = httpx.URL(api_url).port or 8000
         print(
-            "             Start the server with: uv run uvicorn app.main:app --port 8000"
+            f"             Start the server with: uv run uvicorn app.main:app --port {port}"
         )
     except ValueError:
         print(
@@ -318,7 +328,7 @@ async def main() -> None:
         print("-" * 65)
         print("STATUS: ALL SMOKE CHECKS PASSED")
         if args.seed:
-            search_url = f"{api_url}{settings.API_V1_STR}/search?project_id={project_id}&q=hybrid+search"
+            search_url = f"{api_url}{settings.API_V1_STR}/search?project_id={project_id}&q={DEMO_QUERY.replace(' ', '+')}"
             print("\nPersistent Demo Project Seeded!")
             print(f"Project ID: {project_id}")
             print("\nSearch it once the API is running:")

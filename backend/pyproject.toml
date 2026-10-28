@@ -43,7 +43,7 @@ target-version = "py312"
 [tool.ruff.lint]
 ignore = [
     "B008",    # FastAPI Depends() idiom in endpoint function signatures
-    "BLE001",  # Catching Exception is used intentionally for fallback routing / graceful retrieval degradation
+    "BLE001",  # Experimental modes catch Exception to fall back (planner) or skip a failed variant
     "S110",    # Handled cache loading exception pass
     "ASYNC230", # Allow standard file I/O in offline scripts and benchmark runners
 ]

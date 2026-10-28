@@ -27,6 +27,10 @@ NEXUS runs as a single FastAPI process with a single PostgreSQL instance. There 
 - Background job queue (crawl and embedding run inline or via `asyncio.create_task`)
 - Rate limiting on the API
 
+## Query embedding blocks the event loop
+
+`dense_search()` calls the synchronous `embed_query()` inside the async request handler, so while one request embeds its query, other requests on the same API process wait. BM25 and dense retrieval for a single hybrid query also run one after the other, because they share one `AsyncSession`, which does not support concurrent operations. Moving embedding to a worker thread would allow overlap but has not been implemented or measured.
+
 ## Embedding model is fixed
 
 The system uses `all-MiniLM-L6-v2` (384 dimensions). Changing the model requires re-embedding the entire corpus. There is no multi-model embedding support or model versioning beyond the `model_name` / `model_version` columns in `chunk_embeddings`.

@@ -11,6 +11,7 @@ All commands run from `backend/`.
 1. **Decide whether a run is needed.** Read `conditions.git_commit` in
    `docs/benchmark-evaluation-<split>.json`, then run
    `git diff --stat <commit> HEAD -- app/domains scripts/benchmark pyproject.toml uv.lock`.
+   (Reports from before publication record `d7a9b27`, which is `0ea9343` in published history.)
    If nothing retrieval-relevant changed, cite the existing reports and stop.
 2. **Make the result attributable.** Commit (or ask about) pending changes first; a report from
    a dirty tree is marked `-dirty`.

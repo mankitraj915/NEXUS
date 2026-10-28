@@ -68,7 +68,7 @@ Implementations: [`scripts/benchmark/metrics.py`](../backend/scripts/benchmark/m
 
 ## Results
 
-The generated reports record commit `d7a9b27`. That is the application code that was measured; the harness that produced them (warm-up query, k=60 row, split labels) was committed together with the reports in `e64a899`, before the dirty-tree marker existed.
+The generated reports record commit `d7a9b27`. That is the application code that was measured; the harness that produced them (warm-up query, k=60 row, split labels) was committed together with the reports in `e64a899`, before the dirty-tree marker existed. Before the repository was first published, its history was rewritten to remove a personal file unrelated to the code. That changed every commit hash but no file contents: `d7a9b27` is now `0ea9343` and `e64a899` is now `037f7dd`, with identical trees.
 
 Measured 2026-10-28 on an Intel i5-10200H laptop (4 cores / 8 threads, 8 GB RAM, CPU only, torch 2.13 CPU, 4 intra-op threads), with `all-MiniLM-L6-v2@1110a243` and `ms-marco-MiniLM-L-6-v2@233902d2`.
 

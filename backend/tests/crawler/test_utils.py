@@ -1,3 +1,5 @@
+import socket
+
 import pytest
 
 from app.domains.crawler.normalizer import normalize_url, resolve_url
@@ -20,9 +22,24 @@ def test_resolve_url():
     assert resolve_url("https://example.com/foo", "/bar") == "https://example.com/bar"
 
 
-def test_ssrf_validation_safe():
-    # Should resolve to public IPs
+def test_ssrf_validation_safe(monkeypatch):
+    # Stub DNS so the test is hermetic: a hostname resolving to a public IP is allowed
+    def fake_getaddrinfo(host, port, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.215.14", 0))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
     assert validate_url_safe("https://example.com") is True
+
+
+def test_ssrf_validation_rejects_hostname_resolving_to_private_ip(monkeypatch):
+    # DNS rebinding style: a public-looking hostname that resolves to a private address
+    def fake_getaddrinfo(host, port, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.5", 0))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.delenv("ALLOW_LOCAL_URLS", raising=False)
+    with pytest.raises(SSRFViolation):
+        validate_url_safe("https://internal.example.com")
 
 
 def test_ssrf_validation_unsafe():

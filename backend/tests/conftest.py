@@ -1,10 +1,26 @@
+import os
 import socket
 
+# Integration tests TRUNCATE every table, so they must never touch the development
+# database (which holds the SciFact benchmark index). Point the whole application,
+# including code paths that open their own sessions, at a dedicated test database
+# before any app module reads settings.
+_dev_db = os.environ.get("POSTGRES_DB", "nexus")
+TEST_DB = os.environ.get("NEXUS_TEST_POSTGRES_DB", f"{_dev_db}_test")
+if not TEST_DB.endswith("_test"):
+    raise RuntimeError(
+        f"Refusing to run tests against '{TEST_DB}': the test database name must end with '_test'."
+    )
+os.environ["POSTGRES_DB"] = TEST_DB
+
+import asyncpg
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 import app.domains.benchmark.models
 import app.domains.crawler.models
@@ -17,6 +33,10 @@ from app.config.settings import settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app as fastapi_app
+
+assert settings.POSTGRES_DB == TEST_DB, (
+    "settings were loaded before the test DB override"
+)
 
 
 def is_db_reachable() -> bool:
@@ -32,9 +52,7 @@ def is_db_reachable() -> bool:
         return False
 
 
-from sqlalchemy.pool import NullPool
-
-# Create a separate engine for testing with NullPool to prevent asyncpg connection conflicts
+# Separate engine with NullPool to prevent asyncpg connection conflicts across event loops
 engine = create_async_engine(
     settings.SQLALCHEMY_DATABASE_URI, echo=False, poolclass=NullPool
 )
@@ -43,23 +61,38 @@ TestingSessionLocal = async_sessionmaker(
 )
 
 
-TRUNCATE_SQL = text("""
-    TRUNCATE TABLE 
-        benchmark_mappings, 
-        chunk_embeddings, 
-        crawl_jobs, 
-        crawl_targets, 
-        document_chunks, 
-        document_versions, 
-        documents, 
-        projects, 
-        search_document_stats, 
-        search_postings, 
-        search_project_stats, 
-        search_terms, 
-        users 
-    CASCADE;
+TRUNCATE_SQL = text(f"""
+    TRUNCATE TABLE {", ".join(sorted(Base.metadata.tables))} CASCADE;
 """)
+
+_schema_ready = False
+
+
+async def _ensure_test_database() -> None:
+    """Create the test database, pgvector extension and schema once per session."""
+    global _schema_ready
+    if _schema_ready:
+        return
+    conn = await asyncpg.connect(
+        host=settings.POSTGRES_SERVER,
+        port=int(settings.POSTGRES_PORT),
+        user=settings.POSTGRES_USER,
+        password=settings.POSTGRES_PASSWORD,
+        database="postgres",
+    )
+    try:
+        exists = await conn.fetchval(
+            "SELECT 1 FROM pg_database WHERE datname = $1", TEST_DB
+        )
+        if not exists:
+            await conn.execute(f'CREATE DATABASE "{TEST_DB}"')
+    finally:
+        await conn.close()
+
+    async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        await conn.run_sync(Base.metadata.create_all)
+    _schema_ready = True
 
 
 @pytest_asyncio.fixture
@@ -70,25 +103,18 @@ async def setup_db():
         )
 
     try:
+        await _ensure_test_database()
         async with engine.connect() as conn:
             await conn.execute(TRUNCATE_SQL)
             await conn.commit()
-    except Exception as exc:
-        # If tables don't exist yet, create them
-        try:
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-        except Exception:
-            pytest.skip(f"PostgreSQL/pgvector database error: {exc}")
+    except (OSError, asyncpg.PostgresError, SQLAlchemyError) as exc:
+        pytest.skip(f"PostgreSQL/pgvector test database unavailable: {exc}")
 
     yield
 
-    try:
-        async with engine.connect() as conn:
-            await conn.execute(TRUNCATE_SQL)
-            await conn.commit()
-    except Exception:
-        pass
+    async with engine.connect() as conn:
+        await conn.execute(TRUNCATE_SQL)
+        await conn.commit()
 
 
 @pytest_asyncio.fixture

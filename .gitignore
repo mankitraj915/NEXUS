@@ -52,3 +52,6 @@ Thumbs.db
 
 # Hooks (local agent config)
 hooks.json
+
+# Local agent configuration
+.agents/

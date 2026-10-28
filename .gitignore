@@ -55,3 +55,7 @@ hooks.json
 
 # Local agent configuration
 .agents/
+
+# Personal Claude Code files (shared config lives in .claude/rules and .claude/skills)
+CLAUDE.local.md
+.claude/settings.local.json

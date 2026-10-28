@@ -60,11 +60,11 @@ Search the seeded project (replace `<PROJECT_ID>` with the ID printed in step 4)
 ```bash
 curl -G "http://127.0.0.1:8000/api/v1/search" \
   --data-urlencode "project_id=<PROJECT_ID>" \
-  --data-urlencode "q=hybrid search"
+  --data-urlencode "q=lexical and vector hybrid search"
 ```
 
 ```powershell
-Invoke-RestMethod "http://127.0.0.1:8000/api/v1/search?project_id=<PROJECT_ID>&q=hybrid+search"
+Invoke-RestMethod "http://127.0.0.1:8000/api/v1/search?project_id=<PROJECT_ID>&q=lexical+and+vector+hybrid+search"
 ```
 
 `mode` is `hybrid_fixed` (default, RRF k=10), `lexical` or `dense`. Each result carries

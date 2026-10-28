@@ -20,6 +20,7 @@ from app.domains.documents.service import save_document
 from app.domains.embeddings.pipeline import process_pending_chunks
 from app.domains.projects.models import Project
 from scripts.benchmark.datasets.scifact import SciFactDataset
+from scripts.benchmark.significance import N_RESAMPLES, compare_paired
 
 
 class BenchmarkExperimentConfig(TypedDict):
@@ -41,6 +42,9 @@ SPLIT_DESCRIPTIONS = {
     ),
     "train": "BEIR SciFact train = official SciFact train claims (809); not used for tuning.",
 }
+
+# Paired comparisons are always made against the default configuration.
+DEFAULT_CONFIGURATION = "Fixed Baseline (100/100, k=10)"
 
 DENSE_MODEL_REPO = "sentence-transformers/all-MiniLM-L6-v2"
 RERANKER_MODEL_REPO = "cross-encoder/ms-marco-MiniLM-L-6-v2"
@@ -383,6 +387,7 @@ async def cmd_evaluate(args: argparse.Namespace) -> None:
             )
 
         results_map = {}
+        per_query_map = {}
 
         for exp in experiments:
             print(
@@ -432,7 +437,7 @@ async def cmd_evaluate(args: argparse.Namespace) -> None:
                 ext_ids = [
                     nexus_to_external.get(str(c.document_id), "") for c in candidates
                 ]
-                tracker.add_metrics(ext_ids, query_qrels)
+                tracker.add_metrics(ext_ids, query_qrels, query_id=qid)
 
                 count += 1
                 if count % 100 == 0:
@@ -441,9 +446,22 @@ async def cmd_evaluate(args: argparse.Namespace) -> None:
             summary = tracker.get_summary()
             summary["avg_returned_candidates"] = total_candidates_sum / max(1, count)
             results_map[exp["name"]] = summary
+            per_query_map[exp["name"]] = tracker.per_query()
             print(
                 f"[{exp['name']}] NDCG@10: {summary['ndcg@10']:.4f} | Recall@100: {summary['recall@100']:.4f} | Latency P95: {summary['latency_p95']:.2f}ms"
             )
+
+        default_scores = per_query_map[DEFAULT_CONFIGURATION]["ndcg@10"]
+        significance = [
+            {
+                "configuration": DEFAULT_CONFIGURATION,
+                "baseline": exp["name"],
+                "metric": "ndcg@10",
+                **compare_paired(default_scores, per_query_map[exp["name"]]["ndcg@10"]),
+            }
+            for exp in experiments
+            if exp["name"] != DEFAULT_CONFIGURATION
+        ]
 
         conditions = measurement_conditions()
         os.makedirs("docs", exist_ok=True)
@@ -481,6 +499,22 @@ async def cmd_evaluate(args: argparse.Namespace) -> None:
                     f"| {exp['name']} | {s['ndcg@10']:.4f} | {s['recall@10']:.4f} | {recall_100} | {s['mrr']:.4f} | {s['latency_avg']:.2f} ms | {s['latency_p95']:.2f} ms |\n"
                 )
 
+            f.write(
+                f"\n## Paired comparison: {DEFAULT_CONFIGURATION} vs each configuration (NDCG@10)\n\n"
+                "Per-query differences (default minus other). 95% CI: percentile bootstrap "
+                "of the mean difference; p: two-sided paired randomization test. Both use "
+                f"{N_RESAMPLES:,} resamples with a fixed seed. W / T / L: queries where the "
+                "default scores higher / equal / lower.\n\n"
+            )
+            f.write("| Compared with | Mean Δ NDCG@10 | 95% CI | p | W / T / L |\n")
+            f.write("|---|---:|---:|---:|---:|\n")
+            f.writelines(
+                f"| {row['baseline']} | {row['mean_diff']:+.4f} | "
+                f"[{row['ci_low']:+.4f}, {row['ci_high']:+.4f}] | {row['p_value']:.4f} | "
+                f"{row['wins']} / {row['ties']} / {row['losses']} |\n"
+                for row in significance
+            )
+
         results_file = f"docs/benchmark-evaluation-{split}.json"
         with open(results_file, "w", encoding="utf-8") as f:
             json.dump(
@@ -492,9 +526,14 @@ async def cmd_evaluate(args: argparse.Namespace) -> None:
                     "corpus_documents": expected_corpus,
                     "conditions": conditions,
                     "configurations": [
-                        {**exp, "metrics": results_map[exp["name"]]}
+                        {
+                            **exp,
+                            "metrics": results_map[exp["name"]],
+                            "per_query": per_query_map[exp["name"]],
+                        }
                         for exp in experiments
                     ],
+                    "significance": significance,
                 },
                 f,
                 indent=2,

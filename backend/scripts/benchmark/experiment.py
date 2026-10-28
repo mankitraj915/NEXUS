@@ -10,13 +10,17 @@ class ExperimentTracker:
             "mrr": [],
             "latency": [],
         }
+        self.query_ids: list[str] = []
 
     def add_latency(self, latency_ms: float) -> None:
         self.metrics["latency"].append(latency_ms)
 
-    def add_metrics(self, ext_ids: list[str], qrels: dict[str, int]) -> None:
+    def add_metrics(
+        self, ext_ids: list[str], qrels: dict[str, int], query_id: str = ""
+    ) -> None:
         from scripts.benchmark.metrics import mrr, ndcg_at_k, recall_at_k
 
+        self.query_ids.append(query_id)
         self.metrics["ndcg@5"].append(ndcg_at_k(ext_ids, qrels, k=5))
         self.metrics["ndcg@10"].append(ndcg_at_k(ext_ids, qrels, k=10))
         self.metrics["recall@5"].append(recall_at_k(ext_ids, qrels, k=5, threshold=1))
@@ -26,6 +30,16 @@ class ExperimentTracker:
             recall_at_k(ext_ids, qrels, k=100, threshold=1)
         )
         self.metrics["mrr"].append(mrr(ext_ids, qrels))
+
+    def per_query(self) -> dict[str, list]:
+        """Per-query scores in evaluation order, for paired significance tests."""
+        return {
+            "query_ids": self.query_ids,
+            **{
+                m: [round(v, 6) for v in self.metrics[m]]
+                for m in ("ndcg@10", "recall@100", "mrr")
+            },
+        }
 
     def get_summary(self) -> dict[str, float]:
         def avg(l: list[float]) -> float:

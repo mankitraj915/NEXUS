@@ -53,6 +53,23 @@ For each configuration:
 
 Configurations: BM25 only, dense only, hybrid RRF with k=60 and with k=10 (both depth 100/100). With `--with-rerank`, also k=10 plus cross-encoder reranking of the top 25. Reranked runs return 25 results, so their Recall@100 is reported as n/a.
 
+### Paired significance tests
+
+Every query is run through every configuration, so configurations are compared per query rather than only by their means. The harness compares the default (hybrid RRF k=10) with each other configuration on NDCG@10 and reports:
+
+- the mean per-query difference;
+- a 95% percentile-bootstrap confidence interval for that mean;
+- a two-sided paired randomization (sign-flip) test;
+- win / tie / loss counts.
+
+Both resampling procedures use 10,000 resamples with a fixed seed (`scripts/benchmark/significance.py`).
+
+The analysis was fixed before the first run that produced these tests:
+
+- **Primary comparisons.** On the untuned 809-query split, k=10 against BM25, against dense, and against k=60, on NDCG@10.
+- **Correction.** Holm–Bonferroni at a family-wise α = 0.05 across those three.
+- **Tuning split.** These comparisons are reported but not counted as evidence. k=10 was selected on that split, so its comparison against k=60 there is biased in k=10's favour.
+
 The run writes `backend/docs/benchmark-evaluation-<split>.md` and a `.json` sidecar. These record the timestamp, git commit (`-dirty` if the working tree had changes), CPU, Python/torch/sentence-transformers versions, and the Hugging Face revisions of both models.
 
 ## Metrics

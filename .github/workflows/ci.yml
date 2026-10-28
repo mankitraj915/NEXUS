@@ -8,7 +8,7 @@ on:
 
 jobs:
   quality:
-    name: Lint, Typecheck, Harness Verification & Tests
+    name: Lint, Typecheck, Harness Verification & Unit Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -27,10 +27,13 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --all-groups
+        run: uv sync --all-groups --locked
 
       - name: Ruff Lint Check (Repository-wide)
         run: uv run ruff check .
+
+      - name: Ruff Format Check
+        run: uv run ruff format --check .
 
       - name: Mypy Type Check (Repository-wide)
         run: uv run mypy .
@@ -38,5 +41,58 @@ jobs:
       - name: Benchmark Invariants Verification
         run: uv run python -m scripts.benchmark verify
 
-      - name: Run Test Suite
+      # No database here: integration tests skip, unit and invariant tests run.
+      - name: Run Unit Tests
         run: uv run pytest tests/ -v
+
+  integration:
+    name: Integration Tests & Smoke Test (PostgreSQL + pgvector)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: nexus
+          POSTGRES_PASSWORD: nexus_password
+          POSTGRES_DB: nexus
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U nexus -d nexus"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-groups --locked
+
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-all-MiniLM-L6-v2-v1
+
+      - name: Apply migrations to a fresh database
+        run: uv run alembic upgrade head
+
+      # Integration tests run against the auto-created `nexus_test` database.
+      - name: Run Full Test Suite
+        run: uv run pytest tests/ -v
+
+      - name: End-to-end smoke test (ingest, embed, lexical/dense/hybrid search)
+        run: uv run python -m scripts.dev_smoke

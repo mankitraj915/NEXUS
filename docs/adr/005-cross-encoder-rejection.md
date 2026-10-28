@@ -53,3 +53,7 @@ This does not mean cross-encoders are generally ineffective. The conclusion appl
 - The reranker code is retained (`retrieval/reranker.py`) and the `hybrid_rerank` mode remains available for experimentation
 - The production baseline does not use reranking
 - Future experiments could test larger cross-encoder models or longer passage windows
+
+## Addendum (2026-10-28): re-measurement and reachable experimental mode
+
+Before this date, `SearchMode.normalize_mode` mapped `hybrid_rerank` to `hybrid_fixed`, so the reranking branch was unreachable through the API and the benchmark harness, despite the consequence stated above. Reranking is now an explicit experimental mode, `experimental_hybrid_rerank` (legacy alias `hybrid_rerank`), and `evaluate --with-rerank` measures it. Re-measured on the 300-query split at depth 25: NDCG@10 **0.6752** vs 0.7188 without reranking, average latency 1,273 ms vs 272 ms on the same machine. The decision stands.

@@ -21,7 +21,7 @@ The index is stored structurally in PostgreSQL to maintain transactional consist
 
 ## Indexing Lifecycle
 
-1. `DocumentVersion` is created.
+1. `DocumentVersion` is created. If it replaces an earlier version of the same document, `deindex_document_version()` first removes the old version's postings, decrements term document frequencies and project statistics, and deletes its chunks.
 2. `index_document_version(db, version_id)` is invoked synchronously.
 3. Analyzer converts the raw text into a frequency map and positions list.
 4. Using Postgres `ON CONFLICT DO UPDATE` (upserts), `ProjectStats` and `Terms` are atomically updated.

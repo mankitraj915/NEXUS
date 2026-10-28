@@ -152,6 +152,7 @@ erDiagram
 - **Document uniqueness**: `UniqueConstraint('project_id', 'canonical_url')` — the same URL can exist in different projects but not duplicated within a project.
 - **Term scoping**: `UniqueConstraint('project_id', 'term')` — the inverted index is strictly partitioned by project.
 - **Content deduplication**: Document versions are deduplicated by SHA-256 content hash within the same document.
+- **Single indexed version**: when a document's content changes, the previous version is de-indexed (postings, term document frequencies, project statistics, chunks and embeddings) before the new one is indexed; version rows are kept as history.
 
 ## Retrieval flow (hybrid mode)
 
@@ -170,13 +171,13 @@ erDiagram
 5. Dense path:
    query → embed_query() → pgvector cosine_distance → best chunk per doc → rank
    
-6. reciprocal_rank_fusion(bm25_candidates, dense_candidates, k=60)
+6. reciprocal_rank_fusion(bm25_candidates, dense_candidates, k=10)   # API default
    → Union map by document_id
    → RRF score = Σ 1/(k + rank_i)
    → Sort descending
    → Assign final ranks
    
-7. Return top_k candidates as SearchResponse
+7. Return top_k candidates as SearchResponse (score = RRF score, higher is better; rank = 1..k)
 ```
 
 ### Failure handling

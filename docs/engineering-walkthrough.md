@@ -96,7 +96,7 @@ Across the development history, three experimental approaches were implemented a
 
 - Implemented query feature extraction (8 features: token count, unique ratio, identifier density, quoted term density, term rarity, lexical specificity, NL score, complexity)
 - Implemented query classification (IDENTIFIER_HEAVY, NATURAL_LANGUAGE_QUESTION, TECHNICAL, etc.)
-- Built an exhaustive action-outcome matrix: 6 retrieval configurations × 1,109 queries
+- Built an exhaustive action-outcome matrix: 6 retrieval configurations × 300 queries (BEIR test = official SciFact dev)
 - Trained Decision Tree and Random Forest classifiers with GroupKFold cross-validation
 - Performed regret analysis: mean NDCG regret = −0.0446, 19.7% of queries degraded >0.05
 

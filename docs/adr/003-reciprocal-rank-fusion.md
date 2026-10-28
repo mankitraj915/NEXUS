@@ -52,3 +52,7 @@ Measured on SciFact (300-query test split, depth 100/100):
 - Hybrid mode is the production default (`hybrid_fixed`)
 - Latency is strictly higher than single-retriever mode
 - The fusion implementation in `retrieval/fusion.py` also supports multi-query RRF (Strategy A and B) for experimental query expansion
+
+## Addendum (2026-10-28): split provenance and out-of-sample check
+
+The "300-query test split" above is BEIR's SciFact test qrels, which are the official SciFact **dev** claims, and k was chosen on it, so the +0.0145 gain is an in-sample result. On the 809 BEIR train queries, which were never used for tuning, the re-measured NDCG@10 is 0.7180 for k=10 vs 0.7112 for k=60 (+0.0068), with BM25 at 0.6690 and dense at 0.6759. k=10 remains the default, but the advantage over k=60 is small, and its statistical significance has not been tested. The latency columns above came from an earlier, differently loaded run; current numbers and caveats are in [`docs/benchmarking.md`](../benchmarking.md).

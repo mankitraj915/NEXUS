@@ -18,7 +18,7 @@ Can a learned model predict which retrieval configuration to use based on query 
    - CONFIG_D: BM25=100, Dense=0 (BM25-only)
    - CONFIG_E: BM25=0, Dense=100 (Dense-only)
    - CONFIG_F: BM25=25, Dense=25
-3. Exhaustively evaluated all 6 configurations on 1,109 queries, recording NDCG@10, Recall@100, and latency per query per configuration (`action_outcome_matrix.jsonl`)
+3. Exhaustively evaluated all 6 configurations on the 300 BEIR-test queries (the official SciFact dev claims, the same split used to select RRF k=10), recording NDCG@10, Recall@100, and latency per query per configuration (`action_outcome_matrix.jsonl`)
 4. Trained Decision Tree and Random Forest classifiers targeting a Quality-Constrained Latency Oracle (minimize latency while maintaining NDCG ≥ baseline − ε, with ε = 0.005)
 5. Validated with GroupKFold (5 folds, grouped by query ID to prevent leakage)
 6. Performed regret analysis against the fixed baseline

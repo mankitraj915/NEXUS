@@ -4,7 +4,7 @@ This document explicitly describes what NEXUS does not do and where the system's
 
 ## Dense retrieval uses exact scan
 
-pgvector queries use exact cosine distance computation (`ORDER BY embedding <=> query_embedding`). There is no HNSW or IVFFlat index. This means dense retrieval latency scales linearly with corpus size. On the 5,183-document SciFact corpus this is acceptable (~200ms P95), but would become a bottleneck at tens of thousands of documents.
+pgvector queries use exact cosine distance computation (`ORDER BY embedding <=> query_embedding`). There is no HNSW or IVFFlat index. This means dense retrieval latency scales linearly with corpus size. On the 5,183-document SciFact corpus this is acceptable (dense-only P95 of 210–233 ms measured in this release), but would become a bottleneck at tens of thousands of documents.
 
 Adding an HNSW index is a straightforward pgvector operation, but it has not been implemented or measured, so it is not claimed.
 
@@ -49,10 +49,16 @@ Search results are computed fresh for every query. There is no result cache, emb
 
 ## Test infrastructure
 
-- Integration tests require a live PostgreSQL + pgvector instance
-- CI (`.github/workflows/ci.yml`) runs Ruff linting, Mypy type-checking, and isolated unit tests; integration tests with a live database container are planned for a subsequent CI enhancement
-- The benchmark requires ~10–20 minutes to prepare (ingestion + embedding generation)
-- No end-to-end test of the full benchmark pipeline in CI
+- Integration tests require a live PostgreSQL + pgvector instance. They run in a separate `<POSTGRES_DB>_test` database that they create and truncate, so the development database is never touched.
+- CI (`.github/workflows/ci.yml`) has two jobs: `quality` (Ruff lint and format, Mypy, harness invariants, unit tests; no database or model downloads) and `integration` (pgvector service container, migrations on a fresh database, full test suite, end-to-end smoke test; downloads `all-MiniLM-L6-v2`). The workflow has not yet run on GitHub because the repository has not been published.
+- The benchmark takes roughly 15 minutes to prepare (ingestion + embedding generation) on a laptop CPU.
+- The full SciFact benchmark is not run in CI.
+
+## Runtime costs
+
+- Importing the application takes a few seconds, mostly NLTK pulling in SciPy and scikit-learn on the way to its Snowball stemmer.
+- The first dense or hybrid query in a new process loads `all-MiniLM-L6-v2` and takes several seconds; later queries do not.
+- On Linux, the locked PyPI `torch` wheel pulls CUDA libraries even though NEXUS only uses the CPU (a large download, but no extra RAM).
 
 ## Technical debt
 

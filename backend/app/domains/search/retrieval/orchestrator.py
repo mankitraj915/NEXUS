@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 
@@ -257,7 +258,9 @@ async def execute_search(
         return (res, analysis) if return_analysis else res
 
     if mode == "hybrid_rerank":
-        reranked = _reranker.rerank(query, fused_candidates[:rerank_k], top_k=top_k)
+        reranked = await asyncio.to_thread(
+            _reranker.rerank, query, fused_candidates[:rerank_k], top_k=top_k
+        )
         return (reranked, analysis) if return_analysis else reranked
 
     return ([], analysis) if return_analysis else []

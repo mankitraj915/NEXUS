@@ -1,4 +1,5 @@
 import logging
+import threading
 from typing import TYPE_CHECKING
 
 from app.domains.search.retrieval.models import Candidate
@@ -27,18 +28,21 @@ class LocalCrossEncoderReranker(RerankerProvider):
         # (the stable search modes) do not pay their import time or memory.
         self.model: CrossEncoder | None = None
         self.max_length = max_length
+        # rerank() runs in worker threads; concurrent first requests must load once.
+        self._load_lock = threading.Lock()
 
     def _load_model(self) -> "CrossEncoder":
-        if self.model is None:
-            import torch
-            from sentence_transformers import CrossEncoder
+        with self._load_lock:
+            if self.model is None:
+                import torch
+                from sentence_transformers import CrossEncoder
 
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            logger.info(f"Loading CrossEncoder: {self.model_name} on {device}")
-            self.model = CrossEncoder(
-                self.model_name, max_length=self.max_length, device=device
-            )
-        return self.model
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                logger.info(f"Loading CrossEncoder: {self.model_name} on {device}")
+                self.model = CrossEncoder(
+                    self.model_name, max_length=self.max_length, device=device
+                )
+            return self.model
 
     def rerank(
         self, query: str, candidates: list[Candidate], top_k: int = 10

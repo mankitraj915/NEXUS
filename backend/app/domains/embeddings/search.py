@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 from sqlalchemy import select
@@ -12,7 +13,9 @@ from app.domains.search.schemas import SearchResultItem
 async def dense_search(
     db: AsyncSession, project_id: uuid.UUID, query: str, top_k: int = 10
 ) -> list[SearchResultItem]:
-    query_embedding = provider.embed_query(query)
+    # Encoding is CPU-bound, and the first call loads the model, which took 13-38 s on the
+    # benchmark laptop. Running it inline would stall every request on the event loop.
+    query_embedding = await asyncio.to_thread(provider.embed_query, query)
     if not query_embedding:
         return []
 

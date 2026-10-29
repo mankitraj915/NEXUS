@@ -76,7 +76,7 @@ Response (abbreviated):
 
 On PowerShell: `Invoke-RestMethod "http://127.0.0.1:8000/api/v1/search?project_id=<PROJECT_ID>&q=lexical+and+vector+hybrid+search"`.
 
-- The first dense or hybrid query in a new API process loads the embedding model and takes several seconds.
+- The first dense or hybrid query in a new API process loads the embedding model and takes several seconds. Other requests are still served while it loads.
 - A blank `q` returns 422.
 - Swagger UI is at `http://127.0.0.1:8000/docs`.
 - If port 8000 is taken, use another port and pass the same URL to `scripts.dev_smoke --api-url`.
@@ -184,7 +184,7 @@ flowchart TD
 - `save_document()` stores a document version per project and URL. Identical content is a no-op (SHA-256 hash). Changed content creates a new version and de-indexes the old one.
 - The indexer writes per-project postings with token counts. Positions are stored and used only to choose snippets.
 - `process_pending_chunks()` embeds chunks in batches.
-- At query time, BM25 and dense retrieval run in turn on the request's database session, and RRF fuses their ranked lists.
+- At query time, BM25 and dense retrieval run in turn on the request's database session, and RRF fuses their ranked lists. Model inference (query embedding, experimental reranking) runs in a worker thread so it does not stall the event loop.
 - A failure in either branch propagates as an error rather than being returned as a hybrid result.
 
 **Tenant isolation.** `documents` is unique on `(project_id, canonical_url)` and `search_terms` on `(project_id, term)`, and corpus statistics are kept per project. No document, term or BM25 statistic is shared across projects ([ADR-006](docs/adr/006-project-scoped-isolation.md)).
@@ -219,7 +219,7 @@ uv run pytest tests/                         # integration tests skip without Po
 
 ### Integration tests (Postgres running; CI's `integration` job)
 
-With Postgres up, `uv run pytest tests/` runs all 66 tests.
+With Postgres up, `uv run pytest tests/` runs all 67 tests.
 
 - **Isolation.** Integration tests use a separate database, `<POSTGRES_DB>_test`, which is created automatically and truncated between tests. The development database and its benchmark index are never touched.
 - **Coverage.** Tenant isolation, version replacement, idempotent re-ingestion, empty and no-match queries, ranking order and uniqueness per mode, hybrid fusion on a fresh session, failure propagation, API validation and the crawler pipeline.
@@ -250,11 +250,10 @@ uv run python -m scripts.benchmark evaluate --dataset scifact --split test [--wi
 1. **Exact dense scan.** pgvector computes exact cosine distance with no HNSW or IVFFlat index. That's fine at 5k documents, but cost grows linearly with corpus size.
 2. **Single benchmark.** Quality is measured on one scientific-abstract corpus, and k=10 was tuned on part of it.
 3. **Noisy latency.** Latency numbers come from a single machine (see above). No load or concurrency testing has been done.
-4. **Blocking embedding.** Query embedding runs synchronously inside the async request handler, so concurrent API requests wait for each other's embedding step.
-5. **No authentication.** Project isolation is enforced in the data layer, but any API caller can query any project.
-6. **Character-based chunking.** Chunks of 500 characters with 100 characters of overlap ignore sentence boundaries.
-7. **Inline processing.** Indexing and embedding run in-process; there is no task queue.
-8. **Startup cost.** Importing the app takes a few seconds, mostly NLTK pulling in SciPy and scikit-learn.
+4. **No authentication.** Project isolation is enforced in the data layer, but any API caller can query any project.
+5. **Character-based chunking.** Chunks of 500 characters with 100 characters of overlap ignore sentence boundaries.
+6. **Inline processing.** Indexing and embedding run in-process; there is no task queue.
+7. **Startup cost.** Importing the app takes a few seconds, mostly NLTK pulling in SciPy and scikit-learn.
 
 Full list: [`docs/limitations.md`](docs/limitations.md).
 

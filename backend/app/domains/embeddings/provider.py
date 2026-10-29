@@ -1,3 +1,4 @@
+import threading
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -34,13 +35,16 @@ class LocalSentenceTransformerProvider(EmbeddingProvider):
     def __init__(self, model_name_or_path: str = "all-MiniLM-L6-v2"):
         self._model_name = model_name_or_path
         self._model: SentenceTransformer | None = None
+        # Queries embed in worker threads; concurrent first requests must load once.
+        self._load_lock = threading.Lock()
 
     def _get_model(self) -> "SentenceTransformer":
-        if self._model is None:
-            from sentence_transformers import SentenceTransformer
+        with self._load_lock:
+            if self._model is None:
+                from sentence_transformers import SentenceTransformer
 
-            self._model = SentenceTransformer(self._model_name)
-        return self._model
+                self._model = SentenceTransformer(self._model_name)
+            return self._model
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         if not texts:

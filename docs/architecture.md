@@ -169,7 +169,7 @@ erDiagram
    query → analyze_text() → term lookup → posting retrieval → BM25 score → rank
    
 5. Dense path:
-   query → embed_query() → pgvector cosine_distance → best chunk per doc → rank
+   query → embed_query() in a worker thread → pgvector cosine_distance → best chunk per doc → rank
    
 6. reciprocal_rank_fusion(bm25_candidates, dense_candidates, k=10)   # API default
    → Union map by document_id

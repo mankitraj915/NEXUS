@@ -27,9 +27,11 @@ NEXUS runs as a single FastAPI process with a single PostgreSQL instance. There 
 - Background job queue (crawl and embedding run inline or via `asyncio.create_task`)
 - Rate limiting on the API
 
-## Query embedding blocks the event loop
+## Model inference shares the API process
 
-`dense_search()` calls the synchronous `embed_query()` inside the async request handler, so while one request embeds its query, other requests on the same API process wait. BM25 and dense retrieval for a single hybrid query also run one after the other, because they share one `AsyncSession`, which does not support concurrent operations. Moving embedding to a worker thread would allow overlap but has not been implemented or measured.
+Query embedding and experimental reranking run in a worker thread (`asyncio.to_thread`), so the event loop keeps serving other requests while a model loads or encodes. Before 2026-10-29 they ran inline: the first dense query after startup froze the whole API, health check included, for the full model load (13.8 s and 38.3 s in two cold runs on the benchmark laptop). With the worker thread, the longest event-loop stall across three cold runs was 54–87 ms. The measurement used a timer task on the loop with the database call stubbed out. Rankings are unchanged because the same model encodes the same text. Benchmark latency was not re-measured.
+
+Inference still competes for the same 4 CPU cores, so concurrent dense queries slow each other down; there is no separate inference service or request queue. BM25 and dense retrieval for one hybrid query still run one after the other, because they share one `AsyncSession`, which does not support concurrent operations.
 
 ## Embedding model is fixed
 
@@ -61,7 +63,7 @@ Search results are computed fresh for every query. There is no result cache, emb
 ## Runtime costs
 
 - Importing the application takes a few seconds, mostly NLTK pulling in SciPy and scikit-learn on the way to its Snowball stemmer.
-- The first dense or hybrid query in a new process loads `all-MiniLM-L6-v2` and takes several seconds; later queries do not.
+- The first dense or hybrid query in a new process loads `all-MiniLM-L6-v2` and takes several seconds (13–38 s measured with a cold cache on the 8 GB laptop); later queries do not. Other requests are served meanwhile.
 - On Linux, the locked PyPI `torch` wheel pulls CUDA libraries even though NEXUS only uses the CPU (a large download, but no extra RAM).
 
 ## Technical debt

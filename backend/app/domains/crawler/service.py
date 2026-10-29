@@ -20,6 +20,7 @@ from app.domains.crawler.normalizer import normalize_url, resolve_url
 from app.domains.crawler.parser import parse_html
 from app.domains.crawler.schemas import CrawlJobCreate
 from app.domains.documents.service import save_document
+from app.domains.embeddings.pipeline import process_pending_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +96,13 @@ async def _crawl_worker(job_id: uuid.UUID, semaphore: asyncio.Semaphore) -> None
                         canonical,
                         target.domain,
                         parsed.text,
-                        parsed.metadata,
+                        # Search results read the title from the version metadata.
+                        {"title": parsed.title, **parsed.metadata},
                     )
+                    # save_document indexes BM25 but leaves the chunks PENDING; embed
+                    # them so dense and hybrid search can find the page too.
+                    while await process_pending_chunks(db):
+                        pass
 
                     if target.depth < job.max_depth:
                         for link in parsed.links:

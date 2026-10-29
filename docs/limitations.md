@@ -70,4 +70,4 @@ Search results are computed fresh for every query. There is no result cache, emb
 
 - The `User` model exists in `app/domains/users/models.py` but authentication and user management are not yet implemented
 - The `CrawlJob` response schema is in `crawler/schemas.py` but crawl job listing and pagination are not implemented
-- Embedding pipeline uses `process_pending_chunks()` called inline during document save — no external distributed background worker
+- `save_document()` indexes BM25 and creates PENDING chunks but does not embed them. Callers run `process_pending_chunks()`: the crawl worker after each saved page, the benchmark and smoke scripts after bulk ingestion. There is no separate background worker, so code that calls `save_document()` without it leaves documents BM25-only. Before 2026-10-29 the crawler did not call it, so crawled pages were never embedded (dense search could not find them and hybrid results for them were BM25-only), and their `<title>` was dropped. The published SciFact results are unaffected: the harness embeds explicitly and stores titles itself.

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.documents.models import Document, DocumentVersion
+from app.domains.embeddings.models import Chunk
 from app.domains.users.models import User
 
 from .mock_server import start_mock_server
@@ -56,8 +57,8 @@ async def test_crawler_end_to_end(db_session: AsyncSession, client: AsyncClient)
     assert resp.status_code == 201
     job_id = resp.json()["id"]
 
-    # 3. Wait for crawl to complete
-    max_wait = 20
+    # 3. Wait for crawl to complete (includes embedding; the first call loads the model)
+    max_wait = 240
     completed = False
     for _ in range(max_wait):
         resp = await client.get(f"/api/v1/crawl/jobs/{job_id}")
@@ -82,3 +83,20 @@ async def test_crawler_end_to_end(db_session: AsyncSession, client: AsyncClient)
     stmt = select(DocumentVersion)
     versions = (await db_session.execute(stmt)).scalars().all()
     assert len(versions) == 2
+
+    # 6. Crawled pages are embedded, so dense and hybrid search can find them
+    chunk_stmt = (
+        select(Chunk.status)
+        .join(DocumentVersion)
+        .join(Document)
+        .where(Document.project_id == uuid.UUID(project_id))
+    )
+    statuses = (await db_session.execute(chunk_stmt)).scalars().all()
+    assert statuses and set(statuses) == {"EMBEDDED"}
+
+    resp = await client.get(
+        "/api/v1/search",
+        params={"project_id": project_id, "q": "page 1", "mode": "dense"},
+    )
+    assert resp.status_code == 200
+    assert "Page 1" in [r["title"] for r in resp.json()["results"]]

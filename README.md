@@ -183,7 +183,7 @@ flowchart TD
 **Data flow.**
 - `save_document()` stores a document version per project and URL. Identical content is a no-op (SHA-256 hash). Changed content creates a new version and de-indexes the old one.
 - The indexer writes per-project postings with token counts. Positions are stored and used only to choose snippets.
-- `process_pending_chunks()` embeds chunks in batches.
+- `process_pending_chunks()` embeds pending chunks in batches. The crawler calls it after each saved page; the benchmark and smoke scripts call it after bulk ingestion.
 - At query time, BM25 and dense retrieval run in turn on the request's database session, and RRF fuses their ranked lists. Model inference (query embedding, experimental reranking) runs in a worker thread so it does not stall the event loop.
 - A failure in either branch propagates as an error rather than being returned as a hybrid result.
 
@@ -219,10 +219,10 @@ uv run pytest tests/                         # integration tests skip without Po
 
 ### Integration tests (Postgres running; CI's `integration` job)
 
-With Postgres up, `uv run pytest tests/` runs all 67 tests.
+With Postgres up, `uv run pytest tests/` runs all 68 tests.
 
 - **Isolation.** Integration tests use a separate database, `<POSTGRES_DB>_test`, which is created automatically and truncated between tests. The development database and its benchmark index are never touched.
-- **Coverage.** Tenant isolation, version replacement, idempotent re-ingestion, empty and no-match queries, ranking order and uniqueness per mode, hybrid fusion on a fresh session, failure propagation, API validation and the crawler pipeline.
+- **Coverage.** Tenant isolation, version replacement, idempotent re-ingestion, empty and no-match queries, ranking order and uniqueness per mode, hybrid fusion on a fresh session, failure propagation, API validation, concurrent embedding workers, and the crawler pipeline through to dense search.
 - **CI extras.** CI also applies migrations to a fresh database and runs `scripts.dev_smoke`.
 
 ### Full evaluation (optional: ~15 min ingestion, then ~5–15 min per split on a laptop CPU)

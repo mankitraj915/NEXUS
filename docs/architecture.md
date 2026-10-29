@@ -52,10 +52,10 @@ NEXUS is a hybrid search engine with three major subsystems: **ingestion**, **re
 | Parser | `crawler/parser.py` | BeautifulSoup HTML→text extraction, link discovery, metadata extraction |
 | URL Normalizer | `crawler/normalizer.py` | Canonical URL normalization (lowercase, port stripping, fragment removal) |
 | SSRF Guard | `crawler/ssrf.py` | Blocks private/loopback/link-local IPs via DNS resolution check |
-| Document Service | `documents/service.py` | Project-scoped deduplication via content hash, versioning, triggers indexing + embedding |
+| Document Service | `documents/service.py` | Project-scoped deduplication via content hash, versioning, BM25 indexing and chunking (chunks start PENDING) |
 | Indexer | `search/indexer.py` | Text analysis → term upsert → posting list creation → project stats update |
 | Chunker | `embeddings/chunker.py` | 500-char sliding window with 100-char overlap |
-| Embedding Pipeline | `embeddings/pipeline.py` | Batch embedding with `all-MiniLM-L6-v2`, status tracking (PENDING → EMBEDDED / FAILED) |
+| Embedding Pipeline | `embeddings/pipeline.py` | Batch embedding with `all-MiniLM-L6-v2`, status tracking (PENDING → EMBEDDED / FAILED); concurrent workers claim chunks with `FOR UPDATE SKIP LOCKED` |
 
 ### Retrieval pipeline
 

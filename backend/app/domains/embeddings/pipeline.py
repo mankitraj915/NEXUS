@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 
@@ -45,7 +46,14 @@ async def process_pending_chunks(db: AsyncSession, batch_size: int = 32) -> int:
     """
     Finds PENDING chunks, generates embeddings in batch, and stores them in pgvector.
     """
-    stmt = select(Chunk).where(Chunk.status == "PENDING").limit(batch_size)
+    # Concurrent workers (e.g. two crawl jobs) must not claim the same chunks:
+    # chunk_embeddings.chunk_id is unique, and the loser would mark them FAILED.
+    stmt = (
+        select(Chunk)
+        .where(Chunk.status == "PENDING")
+        .limit(batch_size)
+        .with_for_update(skip_locked=True)
+    )
     chunks = (await db.execute(stmt)).scalars().all()
 
     if not chunks:
@@ -54,7 +62,8 @@ async def process_pending_chunks(db: AsyncSession, batch_size: int = 32) -> int:
     texts_to_embed = [c.text for c in chunks]
 
     try:
-        embeddings = provider.embed_documents(texts_to_embed)
+        # CPU-bound; keep the event loop free when this runs inside the API process.
+        embeddings = await asyncio.to_thread(provider.embed_documents, texts_to_embed)
 
         # Bulk insert embeddings
         db.add_all(

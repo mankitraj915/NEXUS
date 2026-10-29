@@ -56,7 +56,7 @@ Search results are computed fresh for every query. There is no result cache, emb
 ## Test infrastructure
 
 - Integration tests require a live PostgreSQL + pgvector instance. They run in a separate `<POSTGRES_DB>_test` database that they create and truncate, so the development database is never touched.
-- CI (`.github/workflows/ci.yml`) has two jobs: `quality` (Ruff lint and format, Mypy, harness invariants, unit tests; no database or model downloads) and `integration` (pgvector service container, migrations on a fresh database, full test suite, end-to-end smoke test; downloads `all-MiniLM-L6-v2`). The workflow has not yet run on GitHub because the repository has not been published.
+- CI (`.github/workflows/ci.yml`) has two jobs: `quality` (Ruff lint and format, Mypy, harness invariants, unit tests; no database or model downloads) and `integration` (pgvector service container, migrations on a fresh database, full test suite, end-to-end smoke test; downloads `all-MiniLM-L6-v2`). Both jobs run on GitHub Actions for every push and pull request to `main`; for example, run [40820724979](https://github.com/mankitraj915/NEXUS/actions/runs/40820724979) on commit `31eb1d6` passed both.
 - The benchmark takes roughly 15 minutes to prepare (ingestion + embedding generation) on a laptop CPU.
 - The full SciFact benchmark is not run in CI.
 

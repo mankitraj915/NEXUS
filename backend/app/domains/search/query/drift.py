@@ -1,6 +1,6 @@
 import numpy as np
 
-from app.domains.embeddings.pipeline import provider
+from app.domains.embeddings.factory import get_provider
 
 
 class SemanticDriftFilter:
@@ -28,7 +28,7 @@ class SemanticDriftFilter:
 
         # We can embed the original and all variants in one batch for efficiency
         texts_to_embed = [original_query] + variants
-        embeddings = provider.embed_documents(texts_to_embed)
+        embeddings = get_provider().embed_documents(texts_to_embed)
 
         orig_emb = embeddings[0]
         variant_embs = embeddings[1:]

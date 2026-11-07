@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-groups --locked
 
+      - name: Download the pinned ONNX model
+        run: uv run python -m scripts.download_onnx_model
+
       - name: Ruff Lint Check (Repository-wide)
         run: uv run ruff check .
 
@@ -80,6 +83,9 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --all-groups --locked
+
+      - name: Download the pinned ONNX model
+        run: uv run python -m scripts.download_onnx_model
 
       - name: Cache embedding model
         uses: actions/cache@v4

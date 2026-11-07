@@ -23,6 +23,7 @@ def test_missing_key_fails(clear_env):
 
 
 def test_environment_key_works(clear_env, monkeypatch):
+    pytest.importorskip("openai")
     # Test 2: Environment key -> works
     monkeypatch.setenv("OPENAI_API_KEY", "env-key")
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
@@ -39,6 +40,7 @@ def test_environment_key_works(clear_env, monkeypatch):
 
 
 def test_env_file_works(clear_env, tmp_path):
+    pytest.importorskip("openai")
     # Test 3: .env key -> works
     env_file = tmp_path / ".env"
     env_file.write_text("OPENAI_API_KEY=file-key\n")
@@ -55,6 +57,7 @@ def test_env_file_works(clear_env, tmp_path):
 
 
 def test_environment_overrides_env_file(clear_env, tmp_path, monkeypatch):
+    pytest.importorskip("openai")
     # Test 4: Environment overrides .env
     monkeypatch.setenv("OPENAI_API_KEY", "env-override-key")
 
@@ -85,6 +88,7 @@ def test_whitespace_key_rejected(clear_env):
 
 
 def test_provider_does_not_log_secrets(clear_env, caplog):
+    pytest.importorskip("openai")
     # Test 6: Provider initialization does not log secrets
     settings = Settings(OPENAI_API_KEY="super-secret-key", _env_file=None)  # type: ignore[call-arg]
 

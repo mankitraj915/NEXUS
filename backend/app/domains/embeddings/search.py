@@ -5,8 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.documents.models import Document, DocumentVersion
+from app.domains.embeddings.factory import get_provider
 from app.domains.embeddings.models import Chunk, ChunkEmbedding
-from app.domains.embeddings.pipeline import provider
 from app.domains.search.schemas import SearchResultItem
 
 
@@ -15,7 +15,7 @@ async def dense_search(
 ) -> list[SearchResultItem]:
     # Encoding is CPU-bound, and the first call loads the model, which took 13-38 s on the
     # benchmark laptop. Running it inline would stall every request on the event loop.
-    query_embedding = await asyncio.to_thread(provider.embed_query, query)
+    query_embedding = await asyncio.to_thread(get_provider().embed_query, query)
     if not query_embedding:
         return []
 

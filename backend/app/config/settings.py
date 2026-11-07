@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +16,10 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     OPENAI_BASE_URL: str | None = None
     OPENAI_MODEL: str = "gpt-4o-mini"
+
+    EMBEDDING_BACKEND: Literal["onnx", "torch"] = "onnx"
+    EMBEDDING_ONNX_VARIANT: Literal["fp32", "int8"] = "fp32"
+    EMBEDDING_MODEL_DIR: str = "models/all-MiniLM-L6-v2-onnx"
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:

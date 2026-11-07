@@ -9,7 +9,7 @@ The Text Analyzer (`search/analyzer.py`) transforms raw text into an optimized s
 2. **Case Normalization**: Lowercases all input.
 3. **Tokenization**: Uses `\b[\w'-]+\b` to extract words while preserving internal hyphens (e.g., `state-of-the-art`) and apostrophes.
 4. **Stopword Removal**: Filters out a hardcoded set of 150 highly frequent English terms to save index space and computation.
-5. **Stemming**: Utilizes `nltk.stem.snowball.SnowballStemmer` to reduce words to their morphological roots (e.g., "running" -> "run").
+5. **Stemming**: Utilizes a vendored copy of NLTK's `EnglishStemmer` (`app/domains/search/_vendor/nltk_snowball`) to reduce words to their morphological roots (e.g., "running" -> "run").
 
 ## Inverted Index Schema
 

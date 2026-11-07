@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.domains.projects.models import Project
+from app.domains.search.retrieval.optional_deps import ExperimentalModeUnavailable
 from app.domains.search.retrieval.orchestrator import execute_search
 from app.domains.search.schemas import SearchMode, SearchResponse, SearchResultItem
 
@@ -63,16 +64,22 @@ async def search(
         )
 
     normalized_mode = SearchMode.normalize_mode(mode)
-    candidates = await execute_search(
-        db=db,
-        project_id=project_id,
-        query=q,
-        mode=normalized_mode,
-        top_k=top_k,
-        retrieval_k=retrieval_k,
-        rerank_k=rerank_k,
-        rrf_k=rrf_k,
-    )
+    try:
+        candidates = await execute_search(
+            db=db,
+            project_id=project_id,
+            query=q,
+            mode=normalized_mode,
+            top_k=top_k,
+            retrieval_k=retrieval_k,
+            rerank_k=rerank_k,
+            rrf_k=rrf_k,
+        )
+    except ExperimentalModeUnavailable as e:
+        raise HTTPException(
+            status_code=501,
+            detail=f"Mode '{mode}' needs research dependencies: uv sync --group ml",
+        ) from e
 
     # Surface the score that produced the ranking (higher is better) and the 1-based rank
     results = []

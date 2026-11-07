@@ -9,12 +9,10 @@ from app.domains.search.retrieval.dense import retrieve_dense
 from app.domains.search.retrieval.fusion import reciprocal_rank_fusion
 from app.domains.search.retrieval.lexical import retrieve_lexical
 from app.domains.search.retrieval.models import Candidate
-from app.domains.search.retrieval.reranker import LocalCrossEncoderReranker
+from app.domains.search.retrieval.optional_deps import require_ml
+from app.domains.search.retrieval.reranker import get_reranker
 
 logger = logging.getLogger(__name__)
-
-# Single instance of reranker to share loaded model
-_reranker = LocalCrossEncoderReranker()
 
 
 async def execute_search(
@@ -42,6 +40,9 @@ async def execute_search(
     from app.domains.search.schemas import SearchMode
 
     mode = SearchMode.normalize_mode(mode)
+
+    if mode in ("hybrid_rerank", "learned", "multi_query_llm"):
+        require_ml(mode)
 
     analysis = None
 
@@ -259,7 +260,7 @@ async def execute_search(
 
     if mode == "hybrid_rerank":
         reranked = await asyncio.to_thread(
-            _reranker.rerank, query, fused_candidates[:rerank_k], top_k=top_k
+            get_reranker().rerank, query, fused_candidates[:rerank_k], top_k=top_k
         )
         return (reranked, analysis) if return_analysis else reranked
 

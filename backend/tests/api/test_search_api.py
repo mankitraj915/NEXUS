@@ -6,6 +6,8 @@ from httpx import AsyncClient
 import app.api.v1.search as search_api
 from app.domains.documents.service import save_document
 from app.domains.embeddings.pipeline import process_pending_chunks
+from app.domains.search.retrieval import orchestrator
+from app.domains.search.retrieval.optional_deps import ExperimentalModeUnavailable
 from app.domains.users.models import User
 
 DOCS = [
@@ -113,6 +115,26 @@ async def test_search_input_validation(client: AsyncClient, project_id):
             "/api/v1/search", params={**base, "project_id": str(uuid.uuid4())}
         )
     ).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_experimental_mode_without_ml_returns_501(
+    client: AsyncClient, project_id, monkeypatch
+):
+    def missing(mode: str) -> None:
+        raise ExperimentalModeUnavailable(mode, "sentence_transformers")
+
+    monkeypatch.setattr(orchestrator, "require_ml", missing)
+    resp = await client.get(
+        "/api/v1/search",
+        params={
+            "project_id": project_id,
+            "q": "x",
+            "mode": "experimental_hybrid_rerank",
+        },
+    )
+    assert resp.status_code == 501
+    assert "uv sync --group ml" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio

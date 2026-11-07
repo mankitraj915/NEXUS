@@ -14,6 +14,7 @@ from app.domains.search.query.transformer import LLMQueryTransformer
 from app.domains.search.retrieval.orchestrator import execute_search
 from scripts.benchmark.datasets.scifact import SciFactDataset
 from scripts.benchmark.experiment import ExperimentTracker
+from scripts.benchmark.provenance import python_version_line
 
 
 async def cmd_generate_llm_variants(args):
@@ -272,6 +273,7 @@ async def cmd_evaluate_llm(args):
             "docs/llm-query-transformation-evaluation.md", "w", encoding="utf-8"
         ) as f:
             f.write("# NEXUS Phase 8B Query Transformation Evaluation\n\n")
+            f.write(python_version_line() + "\n\n")
             f.write("## 1. Quality / Latency Frontier\n")
             f.write("| Configuration | NDCG@10 | Recall@100 | Latency P95 |\n")
             f.write("|---|---|---|---|\n")

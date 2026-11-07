@@ -7,13 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.documents.models import DocumentVersion
 from app.domains.embeddings.chunker import chunk_text
+from app.domains.embeddings.factory import get_provider
 from app.domains.embeddings.models import Chunk, ChunkEmbedding
-from app.domains.embeddings.provider import LocalSentenceTransformerProvider
 
 logger = logging.getLogger(__name__)
-
-# Initialize the provider as a global instance so model weights stay in memory
-provider = LocalSentenceTransformerProvider()
 
 
 async def process_document_version(db: AsyncSession, version_id: uuid.UUID) -> None:
@@ -60,6 +57,7 @@ async def process_pending_chunks(db: AsyncSession, batch_size: int = 32) -> int:
         return 0
 
     texts_to_embed = [c.text for c in chunks]
+    provider = get_provider()
 
     try:
         # CPU-bound; keep the event loop free when this runs inside the API process.

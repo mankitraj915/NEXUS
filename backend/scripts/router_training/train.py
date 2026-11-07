@@ -8,6 +8,8 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import KFold
 from sklearn.tree import DecisionTreeClassifier
 
+from scripts.benchmark.provenance import python_version_line
+
 OUTCOME_FILE = "scripts/router_training/action_outcome_matrix.jsonl"
 MODEL_OUT = "scripts/router_training/router.pkl"
 
@@ -265,7 +267,7 @@ This report evaluates the performance of a learned routing model designed to opt
 - Worst-case Regret: {worst_regret:.4f}
 """
     with open("docs/routing-evaluation.md", "w") as f:
-        f.write(report_content)
+        f.write(f"{report_content}\n{python_version_line()}\n")
 
     # Train final model on full dataset
     final_model = models["Decision Tree"]

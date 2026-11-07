@@ -1,3 +1,4 @@
+import functools
 import logging
 import threading
 from typing import TYPE_CHECKING
@@ -70,3 +71,8 @@ class LocalCrossEncoderReranker(RerankerProvider):
             c.final_rank = i + 1
 
         return candidates[:top_k]
+
+
+@functools.lru_cache(maxsize=1)
+def get_reranker() -> LocalCrossEncoderReranker:
+    return LocalCrossEncoderReranker()

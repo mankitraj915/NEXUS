@@ -14,19 +14,26 @@ dependencies = [
     "pydantic-settings",
     "greenlet",
     "beautifulsoup4",
+    "httpx",
     "nltk",
-    "sentence-transformers",
+    "numpy",
+    "onnxruntime",
     "pgvector",
-    "openai>=3.3.1",
+    "snowballstemmer",
+    "tokenizers",
 ]
 
 [dependency-groups]
 dev = [
     "pytest",
     "pytest-asyncio",
-    "httpx",
     "ruff",
     "mypy",
+]
+# Benchmark harness, torch baseline and the experimental modes; not installed for serving.
+ml = [
+    "sentence-transformers",
+    "openai>=3.3.1",
 ]
 
 [build-system]

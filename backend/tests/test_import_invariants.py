@@ -3,21 +3,10 @@ import sys
 
 import pytest
 
-# NLTK's stemmer drags in SciPy and scikit-learn; Task 2 of the lean-core plan removes it.
-NEEDS_STEMMER_SWAP = pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="loaded through NLTK"
-)
-
 
 @pytest.mark.parametrize(
     "module",
-    [
-        "torch",
-        "sentence_transformers",
-        pytest.param("scipy", marks=NEEDS_STEMMER_SWAP),
-        pytest.param("sklearn", marks=NEEDS_STEMMER_SWAP),
-        pytest.param("nltk", marks=NEEDS_STEMMER_SWAP),
-    ],
+    ["torch", "sentence_transformers", "scipy", "sklearn", "nltk"],
 )
 def test_app_import_loads_no_heavy_modules(module):
     code = f"import app.main, sys; print({module!r} in sys.modules)"

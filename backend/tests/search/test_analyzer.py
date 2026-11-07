@@ -21,9 +21,10 @@ def test_analyze_unicode_and_hyphens():
     assert tokens == ["ai-nat", "state-of-the-art", "naïv"]
 
 
-def test_snowballstemmer_matches_nltk_on_fixture():
-    import snowballstemmer
+def test_vendored_stemmer_matches_nltk_on_fixture():
     from nltk.stem.snowball import SnowballStemmer
+
+    from app.domains.search._vendor.nltk_snowball.snowball import EnglishStemmer
 
     words = [
         "generously", "dying", "news", "skies", "cancer", "cancerous", "proteins",
@@ -33,7 +34,7 @@ def test_snowballstemmer_matches_nltk_on_fixture():
         "exceeding",
     ]  # fmt: skip
     assert len(words) == 30
-    new = snowballstemmer.stemmer("english")
+    new = EnglishStemmer()
     old = SnowballStemmer("english")
-    differing = [w for w in words if new.stemWord(w) != old.stem(w)]
+    differing = [w for w in words if new.stem(w) != old.stem(w)]
     assert differing == []

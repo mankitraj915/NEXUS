@@ -283,6 +283,6 @@ NEXUS/
 
 ## License
 
-The code is released under the [MIT License](LICENSE).
+The code is released under the [MIT License](LICENSE). Vendored third-party code is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 The SciFact claim texts in `backend/scripts/router_training/action_outcome_matrix.jsonl` come from [SciFact](https://github.com/allenai/scifact) (Wadden et al., 2020) and remain under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The SciFact corpus is not included; the benchmark downloads it, and its abstracts are licensed under ODC-By 1.0.

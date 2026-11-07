@@ -15,11 +15,9 @@ dependencies = [
     "greenlet",
     "beautifulsoup4",
     "httpx",
-    "nltk",
     "numpy",
     "onnxruntime",
     "pgvector",
-    "snowballstemmer",
     "tokenizers",
 ]
 
@@ -32,6 +30,7 @@ dev = [
 ]
 # Benchmark harness, torch baseline and the experimental modes; not installed for serving.
 ml = [
+    "nltk",  # baseline for the parity-analyzer gate
     "sentence-transformers",
     "openai>=3.3.1",
 ]
@@ -46,6 +45,8 @@ packages = ["app"]
 [tool.ruff]
 line-length = 88
 target-version = "py312"
+# Third-party code kept byte-for-byte apart from its imports; see its provenance header.
+extend-exclude = ["app/domains/search/_vendor"]
 
 [tool.ruff.lint]
 ignore = [
@@ -61,6 +62,11 @@ explicit_package_bases = true
 mypy_path = "."
 check_untyped_defs = true
 ignore_missing_imports = true
+exclude = ["app/domains/search/_vendor/"]
+
+[[tool.mypy.overrides]]
+module = "app.domains.search._vendor.*"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

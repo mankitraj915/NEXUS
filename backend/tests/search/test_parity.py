@@ -30,3 +30,11 @@ def test_analyzer_parity_caps_examples_at_50(monkeypatch):
     result = parity.analyzer_parity([text])
     assert result["mismatched_texts"] == 1
     assert len(result["examples"]) == 50
+
+
+def test_gate_compares_real_nltk_with_the_serving_stemmer():
+    # If both sides were one implementation the gate would pass without proving anything.
+    old_module = parity._old_stemmer().__module__
+    new_module = parity._new_stemmer().__module__
+    assert old_module == "nltk.stem.snowball"
+    assert new_module == "app.domains.search._vendor.nltk_snowball.snowball"

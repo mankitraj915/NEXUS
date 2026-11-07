@@ -1,3 +1,8 @@
+> **Rejected candidate, kept as the record of the failed gate.** This is the G1 report for
+> `snowballstemmer` 3.1.1, which failed at commit `7c85aac`. It was not adopted, and its
+> reproduce command now tests the serving stemmer instead. Current result:
+> [parity-analyzer.md](parity-analyzer.md).
+
 # Analyzer parity (gate G1): SCIFACT
 
 Compares `nltk` SnowballStemmer("english") with `snowballstemmer` over the

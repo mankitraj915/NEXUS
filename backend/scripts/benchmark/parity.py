@@ -3,9 +3,7 @@
 from collections.abc import Callable, Iterable
 from typing import TypedDict
 
-import snowballstemmer
-
-from app.domains.search.analyzer import tokenize_text
+from app.domains.search.analyzer import _stemmer, tokenize_text
 
 MAX_EXAMPLES = 50
 
@@ -14,12 +12,13 @@ class AnalyzerParityResult(TypedDict):
     texts: int
     tokens: int
     mismatched_texts: int
-    # (token, NLTK stem, new stem)
+    # (token, NLTK stem, serving stem)
     examples: list[tuple[str, str, str]]
 
 
 def _new_stemmer() -> Callable[[str], str]:
-    return snowballstemmer.stemmer("english").stemWord
+    # The stemmer the analyzer really uses, so the gate tests what is served.
+    return _stemmer.stem
 
 
 def _old_stemmer() -> Callable[[str], str]:
@@ -30,7 +29,7 @@ def _old_stemmer() -> Callable[[str], str]:
 
 
 def analyzer_parity(texts: Iterable[str]) -> AnalyzerParityResult:
-    """Compare both stemmers over the analyzer's tokens, stopwords included.
+    """Compare real NLTK with the serving stemmer over the analyzer's tokens.
 
     Stopwords are kept because analyze_text filters before stemming and features.py calls
     it with remove_stopwords=False: this stream covers both ways the analyzer is used.

@@ -647,8 +647,9 @@ def cmd_parity_analyzer(args) -> int:
     lines = [
         f"# Analyzer parity (gate G1): {args.dataset.upper()}",
         "",
-        'Compares `nltk` SnowballStemmer("english") with `snowballstemmer` over the',
-        "analyzer's tokens, stopwords kept (a superset of the stopword-filtered stream).",
+        'Compares real `nltk` SnowballStemmer("english") with the stemmer the analyzer serves',
+        "(`app/domains/search/_vendor/nltk_snowball`) over the analyzer's tokens, stopwords",
+        "kept (a superset of the stopword-filtered stream).",
         "",
         f"- **Result**: {'PASS' if result['mismatched_texts'] == 0 else 'FAIL'}",
         f"- **Texts**: {result['texts']} ({len(corpus)} corpus title+abstract, {len(queries)} queries)",
@@ -656,15 +657,19 @@ def cmd_parity_analyzer(args) -> int:
         f"- **mismatched_texts**: {result['mismatched_texts']}",
         f"- **Measured**: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')} at commit `{_git_commit()}`",
         f"- **Hardware**: {_cpu_name()}, {os.cpu_count()} logical CPUs, {platform.platform()}",
-        f"- **Versions**: Python {platform.python_version()}, nltk {version('nltk')}, snowballstemmer {version('snowballstemmer')}",
+        f"- **Versions**: Python {platform.python_version()}, nltk {version('nltk')}",
         "",
         "## Reproduce",
         "",
         "`uv sync --group ml`, then `uv run python -m scripts.benchmark parity-analyzer --dataset scifact`.",
+        "",
+        "## Rejected candidates",
+        "",
+        "See [parity-analyzer-rejected-candidates.md](parity-analyzer-rejected-candidates.md).",
     ]
     if result["examples"]:
         lines += ["", "## Differing stems (at most 50)", ""]
-        lines += ["| Token | NLTK | snowballstemmer |", "|---|---|---|"]
+        lines += ["| Token | NLTK | Serving stemmer |", "|---|---|---|"]
         lines += [f"| {t} | {o} | {n} |" for t, o, n in result["examples"]]
     with open(args.report, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")

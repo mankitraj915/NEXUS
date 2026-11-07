@@ -1,9 +1,9 @@
 import re
 import unicodedata
 
-from nltk.stem.snowball import SnowballStemmer
+from app.domains.search._vendor.nltk_snowball.snowball import EnglishStemmer
 
-_stemmer = SnowballStemmer("english")
+_stemmer = EnglishStemmer()
 
 _STOPWORDS = frozenset(
     {

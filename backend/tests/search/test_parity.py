@@ -1,4 +1,9 @@
+import pytest
+
 from scripts.benchmark import parity
+
+# Every test here runs the real-NLTK side of the gate.
+pytest.importorskip("nltk")
 
 
 def test_analyzer_parity_counts_identical_streams():

@@ -20,6 +20,7 @@ from app.domains.documents.service import save_document
 from app.domains.embeddings.pipeline import process_pending_chunks
 from app.domains.projects.models import Project
 from scripts.benchmark.datasets.scifact import SciFactDataset
+from scripts.benchmark.provenance import python_version_line
 from scripts.benchmark.significance import N_RESAMPLES, compare_paired
 
 
@@ -484,6 +485,7 @@ async def cmd_evaluate(args: argparse.Namespace) -> None:
             f.write(
                 f"- **Hardware**: {conditions['cpu']}, {conditions['logical_cpus']} logical CPUs, CPU-only\n"
             )
+            f.write(python_version_line() + "\n")
             f.write(
                 f"- **Models**: dense `{conditions['models']['dense']}`, reranker "
                 f"`{conditions['models']['reranker']}`\n"
@@ -657,7 +659,8 @@ def cmd_parity_analyzer(args) -> int:
         f"- **mismatched_texts**: {result['mismatched_texts']}",
         f"- **Measured**: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')} at commit `{_git_commit()}`",
         f"- **Hardware**: {_cpu_name()}, {os.cpu_count()} logical CPUs, {platform.platform()}",
-        f"- **Versions**: Python {platform.python_version()}, nltk {version('nltk')}",
+        python_version_line(),
+        f"- **Versions**: nltk {version('nltk')}",
         "",
         "## Reproduce",
         "",

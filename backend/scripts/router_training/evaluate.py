@@ -10,6 +10,7 @@ from sklearn.tree import DecisionTreeClassifier
 from app.domains.search.query.classifier import classify_query
 from app.domains.search.query.features import QueryFeatures
 from app.domains.search.query.planner import generate_plan
+from scripts.benchmark.provenance import python_version_line
 
 OUTCOME_FILE = "scripts/router_training/action_outcome_matrix.jsonl"
 EVAL_OUT = "docs/routing-evaluation.md"
@@ -331,7 +332,7 @@ The Decision Tree achieved significant latency savings but we must inspect the w
 (To be updated based on results)
 """
     with open(EVAL_OUT, "w", encoding="utf-8") as f:
-        f.write(md)
+        f.write(f"{md}\n{python_version_line()}\n")
 
     print(f"Evaluation complete. Wrote {EVAL_OUT}")
 

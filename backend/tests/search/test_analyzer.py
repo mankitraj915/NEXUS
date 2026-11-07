@@ -1,3 +1,5 @@
+import pytest
+
 from app.domains.search.analyzer import analyze_text
 
 
@@ -22,6 +24,7 @@ def test_analyze_unicode_and_hyphens():
 
 
 def test_vendored_stemmer_matches_nltk_on_fixture():
+    pytest.importorskip("nltk")
     from nltk.stem.snowball import SnowballStemmer
 
     from app.domains.search._vendor.nltk_snowball.snowball import EnglishStemmer

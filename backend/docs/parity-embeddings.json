@@ -1,0 +1,75 @@
+{
+  "gate": "G2",
+  "passed": true,
+  "dataset": "scifact",
+  "chunks_total": 20672,
+  "chunks_sampled": 2000,
+  "queries": 1109,
+  "seed": 0,
+  "conditions": {
+    "timestamp_utc": "2026-11-07 14:28 UTC",
+    "git_commit": "86dfc37",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "cpu": "Intel(R) Core(TM) i5-10200H CPU @ 2.40GHz",
+    "logical_cpus": 8,
+    "python": "3.12.13",
+    "torch": "2.13.0",
+    "torch_threads": 4,
+    "onnx_threads": 1,
+    "sentence_transformers": "6.0.0",
+    "onnxruntime": "1.31.1",
+    "tokenizers": "0.22.2",
+    "numpy": "2.5.2",
+    "torch_model": "sentence-transformers/all-MiniLM-L6-v2@1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "onnx_files": {
+      "fp32": {
+        "path": "onnx/model.onnx",
+        "sha256": "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452"
+      },
+      "int8": {
+        "path": "onnx/model_quint8_avx2.onnx",
+        "sha256": "b941bf19f1f1283680f449fa6a7336bb5600bdcd5f84d10ddc5cd72218a0fd21"
+      }
+    }
+  },
+  "candidates": {
+    "fp32": {
+      "chunks": {
+        "mean": 0.9999999999997413,
+        "min": 0.9999999999994308,
+        "p1": 0.999999999999563
+      },
+      "queries": {
+        "mean": 0.9999999999997412,
+        "min": 0.9999999999994658,
+        "p1": 0.9999999999995958
+      }
+    },
+    "int8": {
+      "chunks": {
+        "mean": 0.9919524135278546,
+        "min": 0.9749550835741527,
+        "p1": 0.9864723833563338
+      },
+      "queries": {
+        "mean": 0.9926171814728811,
+        "min": 0.9856944672961186,
+        "p1": 0.9886555601605738
+      }
+    }
+  },
+  "ms_per_100": {
+    "baseline": {
+      "chunks": 2710.154639999746,
+      "queries": 1385.194201983574
+    },
+    "fp32": {
+      "chunks": 5060.465735000253,
+      "queries": 790.0365644723848
+    },
+    "int8": {
+      "chunks": 4389.232930000071,
+      "queries": 677.421577998065
+    }
+  }
+}

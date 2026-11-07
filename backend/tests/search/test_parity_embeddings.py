@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from scripts.benchmark.parity import (
+    CosineSummary,
     cosine_summary,
     embedding_parity,
     fp32_passes_g2,
@@ -39,8 +40,8 @@ def test_summary_does_not_assume_unit_vectors():
     ],
 )
 def test_g2_thresholds_apply_to_both_sets(mean, minimum, expected):
-    good = {"mean": 1.0, "min": 1.0, "p1": 1.0}
-    bad = {"mean": mean, "min": minimum, "p1": minimum}
+    good: CosineSummary = {"mean": 1.0, "min": 1.0, "p1": 1.0}
+    bad: CosineSummary = {"mean": mean, "min": minimum, "p1": minimum}
     assert fp32_passes_g2(bad, good) is expected
     assert fp32_passes_g2(good, bad) is expected
 

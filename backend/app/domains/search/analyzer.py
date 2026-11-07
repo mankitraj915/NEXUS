@@ -185,10 +185,8 @@ _STOPWORDS = frozenset(
 )
 
 
-def analyze_text(text: str, remove_stopwords: bool = True) -> list[str]:
-    """
-    Transforms raw text into normalized tokens suitable for an inverted index.
-    """
+def tokenize_text(text: str, remove_stopwords: bool = True) -> list[str]:
+    """Normalizes and splits raw text; the tokens are not stemmed yet."""
     if not text:
         return []
 
@@ -197,12 +195,13 @@ def analyze_text(text: str, remove_stopwords: bool = True) -> list[str]:
 
     tokens = re.findall(r"\b[\w'-]+\b", text)
 
-    analyzed = []
-    for token in tokens:
-        if remove_stopwords and token in _STOPWORDS:
-            continue
+    if remove_stopwords:
+        return [token for token in tokens if token not in _STOPWORDS]
+    return tokens
 
-        stemmed = _stemmer.stem(token)
-        analyzed.append(stemmed)
 
-    return analyzed
+def analyze_text(text: str, remove_stopwords: bool = True) -> list[str]:
+    """
+    Transforms raw text into normalized tokens suitable for an inverted index.
+    """
+    return [_stemmer.stem(token) for token in tokenize_text(text, remove_stopwords)]

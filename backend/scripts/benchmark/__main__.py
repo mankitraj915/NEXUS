@@ -82,10 +82,7 @@ def _cpu_name() -> str:
     return platform.processor() or "unknown"
 
 
-def measurement_conditions() -> dict:
-    import sentence_transformers
-    import torch
-
+def _git_commit() -> str:
     try:
         commit = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
@@ -94,7 +91,7 @@ def measurement_conditions() -> dict:
             check=True,
         ).stdout.strip()
         dirty = subprocess.run(
-            ["git", "status", "--porcelain"],
+            ["git", "status", "--porcelain", "--untracked-files=no"],
             capture_output=True,
             text=True,
             check=True,
@@ -103,6 +100,14 @@ def measurement_conditions() -> dict:
             commit += "-dirty"
     except (OSError, subprocess.CalledProcessError):
         commit = "unknown"
+    return commit
+
+
+def measurement_conditions() -> dict:
+    import sentence_transformers
+    import torch
+
+    commit = _git_commit()
     return {
         "timestamp_utc": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
         "git_commit": commit,
@@ -628,6 +633,49 @@ def cmd_verify(args: argparse.Namespace) -> None:
     print("=" * 70)
 
 
+def cmd_parity_analyzer(args) -> int:
+    from importlib.metadata import version
+
+    from scripts.benchmark.parity import analyzer_parity
+
+    provider = SciFactDataset()
+    provider.prepare()
+    corpus = [f"{doc['title']} {doc['text']}".strip() for doc in provider.iter_corpus()]
+    queries = [q["text"] for q in provider.iter_queries(split="all")]
+    result = analyzer_parity([*corpus, *queries])
+
+    lines = [
+        f"# Analyzer parity (gate G1): {args.dataset.upper()}",
+        "",
+        'Compares `nltk` SnowballStemmer("english") with `snowballstemmer` over the',
+        "analyzer's tokens, stopwords kept (a superset of the stopword-filtered stream).",
+        "",
+        f"- **Result**: {'PASS' if result['mismatched_texts'] == 0 else 'FAIL'}",
+        f"- **Texts**: {result['texts']} ({len(corpus)} corpus title+abstract, {len(queries)} queries)",
+        f"- **Tokens**: {result['tokens']}",
+        f"- **mismatched_texts**: {result['mismatched_texts']}",
+        f"- **Measured**: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')} at commit `{_git_commit()}`",
+        f"- **Hardware**: {_cpu_name()}, {os.cpu_count()} logical CPUs, {platform.platform()}",
+        f"- **Versions**: Python {platform.python_version()}, nltk {version('nltk')}, snowballstemmer {version('snowballstemmer')}",
+        "",
+        "## Reproduce",
+        "",
+        "`uv sync --group ml`, then `uv run python -m scripts.benchmark parity-analyzer --dataset scifact`.",
+    ]
+    if result["examples"]:
+        lines += ["", "## Differing stems (at most 50)", ""]
+        lines += ["| Token | NLTK | snowballstemmer |", "|---|---|---|"]
+        lines += [f"| {t} | {o} | {n} |" for t, o, n in result["examples"]]
+    with open(args.report, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+    print(f"texts: {result['texts']}")
+    print(f"tokens: {result['tokens']}")
+    print(f"mismatched_texts: {result['mismatched_texts']}")
+    print(f"report: {args.report}")
+    return 1 if result["mismatched_texts"] else 0
+
+
 def main():
     parser = argparse.ArgumentParser(description="NEXUS Benchmark Tool")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -674,8 +722,16 @@ def main():
     p_eval_llm = subparsers.add_parser("evaluate-llm")
     p_eval_llm.add_argument("--dataset", required=True, choices=["scifact"])
 
+    p_parity = subparsers.add_parser(
+        "parity-analyzer", help="Gate G1: compare the stemmers over SciFact"
+    )
+    p_parity.add_argument("--dataset", required=True, choices=["scifact"])
+    p_parity.add_argument("--report", default="docs/parity-analyzer.md")
+
     args = parser.parse_args()
 
+    if args.command == "parity-analyzer":
+        sys.exit(cmd_parity_analyzer(args))
     if args.command == "verify":
         cmd_verify(args)
     elif args.command == "prepare":

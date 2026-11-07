@@ -684,6 +684,139 @@ def cmd_parity_analyzer(args) -> int:
     return 1 if result["mismatched_texts"] else 0
 
 
+def cmd_parity_embeddings(args) -> int:
+    from importlib.metadata import version
+    from pathlib import Path
+
+    import torch
+
+    from app.config.settings import settings
+    from app.domains.embeddings.onnx_provider import MODEL_FILES, OnnxMiniLMProvider
+    from app.domains.embeddings.provider import LocalSentenceTransformerProvider
+    from scripts.benchmark.parity import embedding_parity, fp32_passes_g2, sample_chunks
+    from scripts.download_onnx_model import FILES, ensure_model
+
+    model_dir = Path(settings.EMBEDDING_MODEL_DIR)
+    ensure_model(model_dir)
+
+    provider = SciFactDataset()
+    provider.prepare()
+    # The same text production indexes (see cmd_prepare).
+    documents = [
+        f"{doc['title']}\n\n{doc['text']}" if doc["title"] else doc["text"]
+        for doc in provider.iter_corpus()
+    ]
+    queries = [q["text"] for q in provider.iter_queries(split="all")]
+    total_chunks, chunks = sample_chunks(documents, args.sample, args.seed)
+
+    result = embedding_parity(
+        chunks,
+        queries,
+        baseline=LocalSentenceTransformerProvider(),
+        candidates={
+            variant: OnnxMiniLMProvider(model_dir, variant=variant)
+            for variant in ("fp32", "int8")
+        },
+    )
+    fp32 = result["candidates"]["fp32"]
+    passed = fp32_passes_g2(fp32["chunks"], fp32["queries"])
+
+    conditions = {
+        "timestamp_utc": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
+        "git_commit": _git_commit(),
+        "platform": platform.platform(),
+        "cpu": _cpu_name(),
+        "logical_cpus": os.cpu_count(),
+        "python": platform.python_version(),
+        "torch": version("torch"),
+        "torch_threads": torch.get_num_threads(),
+        "onnx_threads": 1,
+        "sentence_transformers": version("sentence-transformers"),
+        "onnxruntime": version("onnxruntime"),
+        "tokenizers": version("tokenizers"),
+        "numpy": version("numpy"),
+        "torch_model": _cached_revision(DENSE_MODEL_REPO),
+        "onnx_files": {
+            v: {"path": p, "sha256": FILES[p]} for v, p in MODEL_FILES.items()
+        },
+    }
+    with open(args.json, "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "gate": "G2",
+                "passed": passed,
+                "dataset": args.dataset,
+                "chunks_total": total_chunks,
+                "chunks_sampled": len(chunks),
+                "queries": len(queries),
+                "seed": args.seed,
+                "conditions": conditions,
+                **result,
+            },
+            f,
+            indent=2,
+        )
+
+    lines = [
+        f"# Embedding parity (gate G2): {args.dataset.upper()}",
+        "",
+        "Cosine between torch (`sentence-transformers`) and ONNX Runtime vectors for the same",
+        "text. Chunks come from the production chunker and text format. Documents are encoded",
+        "in batches and each query alone, as in production. No database is involved.",
+        "",
+        f"- **Result**: {'PASS' if passed else 'FAIL'} (fp32: mean >= 0.9999 and min >= 0.999 on both sets; int8 is not gated here)",
+        f"- **Texts**: {len(chunks)} chunks sampled from {total_chunks} (seed {args.seed}), {len(queries)} queries",
+        f"- **Measured**: {conditions['timestamp_utc']} at commit `{conditions['git_commit']}`",
+        f"- **Hardware**: {conditions['cpu']}, {conditions['logical_cpus']} logical CPUs, CPU-only, {conditions['platform']}",
+        python_version_line(),
+        f"- **Versions**: torch {conditions['torch']}, sentence-transformers {conditions['sentence_transformers']}, onnxruntime {conditions['onnxruntime']}, tokenizers {conditions['tokenizers']}, numpy {conditions['numpy']}",
+        f"- **Torch model**: `{conditions['torch_model']}`",
+    ]
+    lines += [
+        f"- **ONNX {v}**: `{p}`, SHA-256 `{FILES[p]}`" for v, p in MODEL_FILES.items()
+    ]
+    lines += [
+        "",
+        "## Cosine with torch",
+        "",
+        "| Variant | Set | Texts | Mean | Min | P1 |",
+        "|---|---|---:|---:|---:|---:|",
+    ]
+    sizes = {"chunks": len(chunks), "queries": len(queries)}
+    for variant, sets in result["candidates"].items():
+        for name, s in sets.items():
+            lines.append(
+                f"| {variant} | {name} | {sizes[name]} | {s['mean']:.8f} | {s['min']:.8f} | {s['p1']:.8f} |"
+            )
+    lines += [
+        "",
+        "## Encode time",
+        "",
+        f"Milliseconds per 100 texts on this laptop, after one unmeasured warm-up, one run each. Torch used {conditions['torch_threads']} threads and ONNX used 1, as configured for serving, so these columns are not a like-for-like speed comparison between runtimes. Load-dependent and indicative only.",
+        "",
+        "| Runtime | Threads | Chunks | Queries |",
+        "|---|---:|---:|---:|",
+    ]
+    labels = {"baseline": ("torch", conditions["torch_threads"])}
+    labels.update({v: (f"ONNX {v}", 1) for v in result["candidates"]})
+    for key, ms in result["ms_per_100"].items():
+        label, threads = labels[key]
+        lines.append(
+            f"| {label} | {threads} | {ms['chunks']:.0f} | {ms['queries']:.0f} |"
+        )
+    lines += [
+        "",
+        "## Reproduce",
+        "",
+        f"`uv sync --group ml`, then `uv run python -m scripts.benchmark parity-embeddings --dataset {args.dataset} --sample {args.sample} --seed {args.seed}`.",
+    ]
+    with open(args.report, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+    print("\n".join(lines))
+    return 0 if passed else 1
+
+
 def main():
     parser = argparse.ArgumentParser(description="NEXUS Benchmark Tool")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -736,10 +869,22 @@ def main():
     p_parity.add_argument("--dataset", required=True, choices=["scifact"])
     p_parity.add_argument("--report", default="docs/parity-analyzer.md")
 
+    p_parity_emb = subparsers.add_parser(
+        "parity-embeddings",
+        help="Gate G2: compare ONNX with torch vectors over SciFact",
+    )
+    p_parity_emb.add_argument("--dataset", required=True, choices=["scifact"])
+    p_parity_emb.add_argument("--sample", type=int, default=2000)
+    p_parity_emb.add_argument("--seed", type=int, default=0)
+    p_parity_emb.add_argument("--report", default="docs/parity-embeddings.md")
+    p_parity_emb.add_argument("--json", default="docs/parity-embeddings.json")
+
     args = parser.parse_args()
 
     if args.command == "parity-analyzer":
         sys.exit(cmd_parity_analyzer(args))
+    if args.command == "parity-embeddings":
+        sys.exit(cmd_parity_embeddings(args))
     if args.command == "verify":
         cmd_verify(args)
     elif args.command == "prepare":
